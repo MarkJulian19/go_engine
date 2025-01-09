@@ -30,7 +30,7 @@ func main() {
 
 	gl.Enable(gl.DEPTH_TEST)
 	program := shaders.InitShaders()
-	world := world.NewWorld(16, 128, 16) // Example size, can be configurable
+	world := world.NewWorld(16, 256, 16) // Example size, can be configurable
 	camera := camera.NewCamera(mgl32.Vec3{0, 20, 0})
 	initMouseHandler(window, camera)
 
@@ -79,18 +79,6 @@ func runMainLoop(window *glfw.Window, program uint32, config *src.Config, world 
 	StartChunkListener(world, chunkGenCh, chunkDelCh)
 	StartChunkListener(world, chunkGenCh, chunkDelCh)
 
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
 	for !window.ShouldClose() {
 		currentFrame := time.Now()
 		deltaTime := currentFrame.Sub(lastFrame).Seconds()
@@ -108,7 +96,7 @@ func runMainLoop(window *glfw.Window, program uint32, config *src.Config, world 
 
 func updateWorld(world *world.World, camera *camera.Camera, chunkGenCh chan [2]int, chunkDelCh chan [2]int) {
 	playerPos := camera.Position
-	world.UpdateChunks(int(playerPos.X()), int(playerPos.Z()), 30, chunkGenCh, chunkDelCh) // Adjust radius as needed
+	world.UpdateChunks(int(playerPos.X()), int(playerPos.Z()), 20, chunkGenCh, chunkDelCh) // Adjust radius as needed
 }
 
 func renderScene(window *glfw.Window, program uint32, config *src.Config, world *world.World, camera *camera.Camera) {
@@ -127,7 +115,7 @@ func renderScene(window *glfw.Window, program uint32, config *src.Config, world 
 		// vertices, indices := chunk.GenerateMesh(nil) // Pass neighbors if needed
 		// vao := makeVAO(vertices, indices)
 
-		if (chunk.CreateBuf || chunk.UpdateBuf) && counter < 20 {
+		if (chunk.CreateBuf || chunk.UpdateBuf) && counter < 40 {
 			// fmt.Printf("gen frame %d, %d\n", coord[0], coord[1])
 			if chunk.VAO != 0 {
 				gl.DeleteVertexArrays(1, &chunk.VAO)
