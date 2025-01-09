@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/ojrac/opensimplex-go"
 )
 
@@ -441,32 +440,32 @@ func (w *World) GenerateChunk(cx, cz int) {
 //			}
 //		}
 //	}
-func (chunk *Chunk) GenerateBuffers(neighbors map[string]*Chunk) {
-	vertices, indices := chunk.GenerateMesh(neighbors)
-	chunk.IndicesCount = len(indices)
+// func (chunk *Chunk) GenerateBuffers(neighbors map[string]*Chunk) {
+// 	vertices, indices := chunk.GenerateMesh(neighbors)
+// 	chunk.IndicesCount = len(indices)
 
-	var vao, vbo, ebo uint32
-	gl.GenVertexArrays(1, &vao)
-	gl.BindVertexArray(vao)
+// 	var vao, vbo, ebo uint32
+// 	gl.GenVertexArrays(1, &vao)
+// 	gl.BindVertexArray(vao)
 
-	gl.GenBuffers(1, &vbo)
-	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(vertices), gl.STATIC_DRAW)
+// 	gl.GenBuffers(1, &vbo)
+// 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+// 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(vertices), gl.STATIC_DRAW)
 
-	gl.GenBuffers(1, &ebo)
-	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*4, gl.Ptr(indices), gl.STATIC_DRAW)
+// 	gl.GenBuffers(1, &ebo)
+// 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+// 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*4, gl.Ptr(indices), gl.STATIC_DRAW)
 
-	// Настройка атрибутов вершин
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0)) // Координаты
-	gl.EnableVertexAttribArray(0)
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4)) // Цвет
-	gl.EnableVertexAttribArray(1)
+// 	// Настройка атрибутов вершин
+// 	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0)) // Координаты
+// 	gl.EnableVertexAttribArray(0)
+// 	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4)) // Цвет
+// 	gl.EnableVertexAttribArray(1)
 
-	chunk.VAO = vao
-	chunk.VBO = vbo
-	chunk.EBO = ebo
-}
+// 	chunk.VAO = vao
+// 	chunk.VBO = vbo
+// 	chunk.EBO = ebo
+// }
 
 // Собирает соседние чанки
 func (w *World) collectNeighbors(cx, cz int) map[string]*Chunk {
@@ -558,7 +557,7 @@ func (w *World) UpdateChunks(playerX, playerZ int, radius int, chunkGenCh chan [
 				if len(chunkGenCh) < 10000 {
 					chunkGenCh <- [2]int{x, z}
 				}
-				// fmt.Printf("%d, %d\n", x, z)
+				//fmt.Printf("%d, %d\n", x, z)
 			}
 			w.Mu.Unlock()
 		}
@@ -576,14 +575,14 @@ func (w *World) UpdateChunks(playerX, playerZ int, radius int, chunkGenCh chan [
 }
 
 // Удаляет чанк и освобождает связанные ресурсы (VAO, VBO, EBO)
-func (w *World) RemoveChunk(cx, cz int) {
+func (w *World) RemoveChunk(cx, cz int, vramCh chan [3]uint32) {
 	coord := [2]int{cx, cz}
 	w.Mu.Lock()
 	defer w.Mu.Unlock()
-	// chunk, exists := w.Chunks[coord]
-	// if !exists {
-	// 	return // Чанк уже удален или не существует
-	// }
+	chunk, exists := w.Chunks[coord]
+	if !exists {
+		return // Чанк уже удален или не существует
+	}
 
 	// // Удаляем буферы OpenGL
 	// gl.DeleteVertexArrays(1, &chunk.VAO)
@@ -591,5 +590,6 @@ func (w *World) RemoveChunk(cx, cz int) {
 	// gl.DeleteBuffers(1, &chunk.EBO)
 
 	// Удаляем чанк из карты
+	vramCh <- [3]uint32{chunk.VAO, chunk.EBO, chunk.VBO}
 	delete(w.Chunks, coord)
 }

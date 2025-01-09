@@ -51,7 +51,7 @@ func initMouseHandler(window *glfw.Window, camera *camera.Camera) {
 	}()
 	// return mouseEvents
 }
-func StartChunkListener(w *world.World, genCh, delCh <-chan [2]int) {
+func StartChunkListener(w *world.World, genCh, delCh <-chan [2]int, vramCh chan [3]uint32) {
 	go func() {
 		for {
 			select {
@@ -63,7 +63,7 @@ func StartChunkListener(w *world.World, genCh, delCh <-chan [2]int) {
 			case coords := <-delCh:
 				// Если приходят координаты для удаления
 				x, z := coords[0], coords[1]
-				w.RemoveChunk(x, z)
+				w.RemoveChunk(x, z, vramCh)
 			}
 		}
 	}()
@@ -72,12 +72,13 @@ func runMainLoop(window *glfw.Window, program uint32, config *src.Config, world 
 	lastFrame := time.Now()
 	chunkGenCh := make(chan [2]int, 1000000)
 	chunkDelCh := make(chan [2]int, 1000000)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
-	StartChunkListener(world, chunkGenCh, chunkDelCh)
+	vramGCCh := make(chan [3]uint32, 1000000)
+	StartChunkListener(world, chunkGenCh, chunkDelCh, vramGCCh)
+	StartChunkListener(world, chunkGenCh, chunkDelCh, vramGCCh)
+	StartChunkListener(world, chunkGenCh, chunkDelCh, vramGCCh)
+	StartChunkListener(world, chunkGenCh, chunkDelCh, vramGCCh)
+	StartChunkListener(world, chunkGenCh, chunkDelCh, vramGCCh)
+	StartChunkListener(world, chunkGenCh, chunkDelCh, vramGCCh)
 
 	for !window.ShouldClose() {
 		currentFrame := time.Now()
@@ -89,6 +90,7 @@ func runMainLoop(window *glfw.Window, program uint32, config *src.Config, world 
 		updateWorld(world, camera, chunkGenCh, chunkDelCh)
 
 		renderScene(window, program, config, world, camera)
+		vramGC(vramGCCh)
 		frameCount++
 		src.ChangeWindowTitle(&frameCount, &prevTime, window)
 	}
@@ -115,39 +117,53 @@ func renderScene(window *glfw.Window, program uint32, config *src.Config, world 
 		// vertices, indices := chunk.GenerateMesh(nil) // Pass neighbors if needed
 		// vao := makeVAO(vertices, indices)
 
-		if (chunk.CreateBuf || chunk.UpdateBuf) && counter < 40 {
-			// fmt.Printf("gen frame %d, %d\n", coord[0], coord[1])
-			if chunk.VAO != 0 {
-				gl.DeleteVertexArrays(1, &chunk.VAO)
+		if counter < 80 {
+			if chunk.CreateBuf {
+				// Создание новых буферов
+				if chunk.VAO != 0 {
+					gl.DeleteVertexArrays(1, &chunk.VAO)
+				}
+				if chunk.VBO != 0 {
+					gl.DeleteBuffers(1, &chunk.VBO)
+				}
+				if chunk.EBO != 0 {
+					gl.DeleteBuffers(1, &chunk.EBO)
+				}
+
+				var vao, vbo, ebo uint32
+				gl.GenVertexArrays(1, &vao)
+				gl.BindVertexArray(vao)
+
+				gl.GenBuffers(1, &vbo)
+				gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+				gl.BufferData(gl.ARRAY_BUFFER, len(chunk.Vertices)*4, gl.Ptr(chunk.Vertices), gl.STATIC_DRAW)
+
+				gl.GenBuffers(1, &ebo)
+				gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+				gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(chunk.Indices)*4, gl.Ptr(chunk.Indices), gl.STATIC_DRAW)
+
+				gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0))
+				gl.EnableVertexAttribArray(0)
+				gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4))
+				gl.EnableVertexAttribArray(1)
+
+				chunk.VAO, chunk.VBO, chunk.EBO = vao, vbo, ebo
+				chunk.CreateBuf = false
+			} else if chunk.UpdateBuf {
+				// Обновление данных в существующих буферах
+				gl.BindVertexArray(chunk.VAO)
+
+				gl.BindBuffer(gl.ARRAY_BUFFER, chunk.VBO)
+				gl.BufferSubData(gl.ARRAY_BUFFER, 0, len(chunk.Vertices)*4, gl.Ptr(chunk.Vertices))
+
+				gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, chunk.EBO)
+				gl.BufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, len(chunk.Indices)*4, gl.Ptr(chunk.Indices))
 			}
-			if chunk.VBO != 0 {
-				gl.DeleteBuffers(1, &chunk.VBO)
-			}
-			if chunk.EBO != 0 {
-				gl.DeleteBuffers(1, &chunk.EBO)
-			}
 
-			var vao, vbo, ebo uint32
-			gl.GenVertexArrays(1, &vao)
-			gl.BindVertexArray(vao)
-
-			gl.GenBuffers(1, &vbo)
-			gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-			gl.BufferData(gl.ARRAY_BUFFER, len(chunk.Vertices)*4, gl.Ptr(chunk.Vertices), gl.STATIC_DRAW)
-
-			gl.GenBuffers(1, &ebo)
-			gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-			gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(chunk.Indices)*4, gl.Ptr(chunk.Indices), gl.STATIC_DRAW)
-
-			gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0))
-			gl.EnableVertexAttribArray(0)
-			gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4))
-			gl.EnableVertexAttribArray(1)
-
-			chunk.VAO, chunk.VBO, chunk.EBO = vao, vbo, ebo
-			chunk.CreateBuf = false
+			chunk.UpdateBuf = false
 			counter++
 		}
+
 		model := mgl32.Translate3D(
 			float32(coord[0]*chunk.SizeX),
 			0,
@@ -167,6 +183,16 @@ func renderScene(window *glfw.Window, program uint32, config *src.Config, world 
 	glfw.PollEvents()
 	// elapsedTime := time.Since(startTime)
 	// fmt.Printf("renderScene executed in %v\n", elapsedTime)
+}
+
+func vramGC(vramGCCh chan [3]uint32) {
+	//fmt.Println("ROFL")
+	for len(vramGCCh) > 0 {
+		x := <-vramGCCh
+		gl.DeleteVertexArrays(1, &x[0])
+		gl.DeleteBuffers(1, &x[1])
+		gl.DeleteBuffers(1, &x[2])
+	}
 }
 
 func setUniformMatrix4fv(program uint32, name string, matrix mgl32.Mat4) {
