@@ -29,7 +29,7 @@ func CreateWindow(config *Config) (*glfw.Window, error) {
 	return window, nil
 }
 
-func ChangeWindowTitle(frameCount *int, prevTime *float64, window *glfw.Window) {
+func ChangeWindowTitle(frameCount *int, prevTime *float64, window *glfw.Window, Cunt_ch int) {
 	currentTime := glfw.GetTime()
 	if currentTime-*prevTime >= 0.1 {
 		var memStats runtime.MemStats
@@ -37,7 +37,7 @@ func ChangeWindowTitle(frameCount *int, prevTime *float64, window *glfw.Window) 
 		allocatedMemory := memStats.Alloc / 1024 / 1024 // в МБ
 
 		fps := *frameCount * 10
-		title := fmt.Sprintf("FPS: %d | Memory: %d MB", fps, allocatedMemory)
+		title := fmt.Sprintf("FPS: %d | Memory: %d MB, Chunks: %d", fps, allocatedMemory, Cunt_ch)
 		window.SetTitle(title)
 
 		*frameCount = 0

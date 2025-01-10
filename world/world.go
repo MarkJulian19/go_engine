@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/ojrac/opensimplex-go"
 )
 
@@ -198,62 +199,59 @@ func (chunk *Chunk) UpdateBuffers(neighbors map[string]*Chunk) {
 
 // Генерирует меш чанка
 func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint32) {
-	var vertices []float32
+	var vertices []float32 // здесь будем класть по 9 float на вершину
 	var indices []uint32
 
-	// var mutex sync.Mutex  // Для защиты общей памяти
-	// var wg sync.WaitGroup // Для ожидания завершения всех горутин
-
-	// Горутинно обрабатываем данные для каждой оси X
 	for x := 0; x < chunk.SizeX; x++ {
-		// wg.Add(1) // Увеличиваем счётчик горутин
-		// go func(x int) {
-		// defer wg.Done() // Уменьшаем счётчик после завершения работы
-
-		var localVertices []float32
-		var localIndices []uint32
-
 		for y := 0; y < chunk.SizeY; y++ {
 			for z := 0; z < chunk.SizeZ; z++ {
-				// Получаем текущий блок
+
 				block := chunk.Blocks[blockIndex(x, y, z, chunk.SizeX, chunk.SizeY, chunk.SizeZ)]
 				if block.Id == 0 {
-					continue // Пропускаем блоки воздуха
+					continue // Воздух не рисуем
 				}
 
-				// Генерация граней для блока
+				// Для каждой из 6 граней куба
 				for _, face := range cubeFaces {
 					nx, ny, nz := x+face.OffsetX, y+face.OffsetY, z+face.OffsetZ
 					if IsAirWithNeighbors(chunk, nx, ny, nz, neighbors) {
-						startIdx := len(localVertices) / 6
-						for _, vertex := range face.Vertices {
-							localVertices = append(localVertices,
-								float32(x)+vertex[0],
-								float32(y)+vertex[1],
-								float32(z)+vertex[2],
-								block.Color[0], block.Color[1], block.Color[2])
+
+						// Нормаль этой грани:
+						// face.OffsetX, face.OffsetY, face.OffsetZ
+						// (для куба это 0,0,1 или -1,0,0 и т.д.)
+						normX := float32(face.OffsetX)
+						normY := float32(face.OffsetY)
+						normZ := float32(face.OffsetZ)
+
+						// Для удобства
+						r := block.Color[0]
+						g := block.Color[1]
+						b := block.Color[2]
+
+						startIdx := uint32(len(vertices) / 9)
+						// т.к. теперь 9 float на вершину
+
+						// Добавляем 4 вершины (квадрат)
+						for _, vtx := range face.Vertices {
+							px := float32(x) + vtx[0]
+							py := float32(y) + vtx[1]
+							pz := float32(z) + vtx[2]
+
+							vertices = append(vertices,
+								px, py, pz, // позиция
+								normX, normY, normZ, // нормаль
+								r, g, b) // цвет
 						}
-						localIndices = append(localIndices,
-							uint32(startIdx), uint32(startIdx+1), uint32(startIdx+2),
-							uint32(startIdx+2), uint32(startIdx+3), uint32(startIdx))
+
+						// Индексы
+						indices = append(indices,
+							startIdx+0, startIdx+1, startIdx+2,
+							startIdx+2, startIdx+3, startIdx+0)
 					}
 				}
 			}
 		}
-
-		// Добавляем локальные данные в общие массивы с блокировкой
-		// mutex.Lock()
-		offset := len(vertices) / 6
-		vertices = append(vertices, localVertices...)
-		for _, idx := range localIndices {
-			indices = append(indices, idx+uint32(offset))
-		}
-		// mutex.Unlock()
-		// }(x)
 	}
-
-	// Ожидаем завершения всех горутин
-	// wg.Wait()
 
 	return vertices, indices
 }
@@ -291,11 +289,11 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.N
 
 				if y <= height {
 					switch {
-					case absoluteX%5 != 0:
-						blocks[idx] = Block{
-							Id:    0,
-							Color: [3]float32{0.1 + 0.3*rand.Float32(), 0.8 + 0.2*rand.Float32(), 0.1 + 0.3*rand.Float32()},
-						}
+					// case absoluteX%5 != 0:
+					// 	blocks[idx] = Block{
+					// 		Id:    0,
+					// 		Color: [3]float32{0.1 + 0.3*rand.Float32(), 0.8 + 0.2*rand.Float32(), 0.1 + 0.3*rand.Float32()},
+					// 	}
 					case biomeValue > 0.3 && y == height: // Лес, верхний слой — трава
 						blocks[idx] = Block{
 							Id:    2,
@@ -554,7 +552,7 @@ func (w *World) UpdateChunks(playerX, playerZ int, radius int, chunkGenCh chan [
 			w.Mu.Lock()
 			if _, exists := w.Chunks[coord]; !exists {
 				// w.GenerateChunk(x, z)
-				if len(chunkGenCh) < 10000 {
+				if len(chunkGenCh) < 99 {
 					chunkGenCh <- [2]int{x, z}
 				}
 				//fmt.Printf("%d, %d\n", x, z)
@@ -590,6 +588,59 @@ func (w *World) RemoveChunk(cx, cz int, vramCh chan [3]uint32) {
 	// gl.DeleteBuffers(1, &chunk.EBO)
 
 	// Удаляем чанк из карты
-	vramCh <- [3]uint32{chunk.VAO, chunk.EBO, chunk.VBO}
+	vramCh <- [3]uint32{chunk.VAO, chunk.VBO, chunk.EBO}
 	delete(w.Chunks, coord)
+}
+func (chunk *Chunk) GetBoundingBox(coord [2]int) [2]mgl32.Vec3 {
+	// Минимальная точка чанка (нижний левый угол в мировых координатах)
+	min := mgl32.Vec3{
+		float32(coord[0] * chunk.SizeX),
+		0, // Минимальная высота чанка всегда 0
+		float32(coord[1] * chunk.SizeZ),
+	}
+
+	// Максимальная точка чанка (верхний правый угол в мировых координатах)
+	max := mgl32.Vec3{
+		float32((coord[0] + 1) * chunk.SizeX),
+		float32(chunk.SizeY), // Максимальная высота чанка равна его высоте
+		float32((coord[1] + 1) * chunk.SizeZ),
+	}
+
+	return [2]mgl32.Vec3{min, max}
+}
+func (w *World) GetBlock(x, y, z int) Block {
+	// Проверяем высоту
+	if y < 0 || y >= w.SizeY {
+		return Block{Id: 0}
+	}
+	// Координаты чанка
+	cx := x / w.SizeX
+	cz := z / w.SizeZ
+
+	// Локальные координаты внутри чанка
+	lx := x % w.SizeX
+	lz := z % w.SizeZ
+	// Исправляем, если x или z отрицательные (Go % может давать отрицательное)
+	if lx < 0 {
+		lx += w.SizeX
+		cx -= 1
+	}
+	if lz < 0 {
+		lz += w.SizeZ
+		cz -= 1
+	}
+
+	chunkCoord := [2]int{cx, cz}
+
+	w.Mu.RLock()
+	chunk, exists := w.Chunks[chunkCoord]
+	w.Mu.RUnlock()
+	if !exists {
+		// Чанка нет — возвращаем воздух
+		return Block{Id: 0}
+	}
+
+	// Индекс в одномерном массиве
+	idx := blockIndex(lx, y, lz, chunk.SizeX, chunk.SizeY, chunk.SizeZ)
+	return chunk.Blocks[idx]
 }
