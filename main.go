@@ -8,6 +8,7 @@ import (
 	"engine/src/windows"
 	"engine/src/workers"
 	"engine/src/world"
+	"math"
 	"runtime"
 	"time"
 
@@ -20,6 +21,7 @@ var (
 	frameCount int
 	prevTime       = float64(0)
 	numWorkers int = 6
+	timeOfDay      = float64(0)
 )
 
 func init() {
@@ -39,6 +41,7 @@ func main() {
 	// Инициализируем шейдеры
 	renderProgram := render.InitShaders()    // Основной шейдер с тенями и отражениями
 	depthProgram := render.InitDepthShader() // Шейдер для рендера карты глубины (теней)
+	textProgram := render.InitTextShader()
 
 	// Создаём FBO и текстуру для карты теней
 	render.CreateDepthMap()
@@ -52,7 +55,7 @@ func main() {
 
 	initMouseHandler(window, cameraObj)
 
-	runMainLoop(window, renderProgram, depthProgram, config, worldObj, cameraObj)
+	runMainLoop(window, renderProgram, depthProgram, textProgram, config, worldObj, cameraObj)
 }
 
 func initMouseHandler(window *glfw.Window, camera *camera.Camera) {
@@ -68,7 +71,7 @@ func initMouseHandler(window *glfw.Window, camera *camera.Camera) {
 
 func runMainLoop(
 	window *glfw.Window,
-	renderProgram, depthProgram uint32,
+	renderProgram, depthProgram, textProgram uint32,
 	config *config.Config,
 	worldObj *world.World,
 	cameraObj *camera.Camera,
@@ -91,12 +94,15 @@ func runMainLoop(
 
 	// Ортопроекция для теней (чтобы «охватить» сцену)
 	// lightProjection := mgl32.Ortho(-200, 200, -200, 200, 0.1, 500.0)
-
 	for !window.ShouldClose() {
+
 		currentFrame := time.Now()
 		deltaTime := currentFrame.Sub(lastFrame).Seconds()
 		lastFrame = currentFrame
-
+		timeOfDay += deltaTime * 0.1 // Скорость вращения (0.1 для медленных суток)
+		if timeOfDay > 2*math.Pi {   // Цикл повторяется каждые 360° (2π радиан)
+			timeOfDay -= 2 * math.Pi
+		}
 		// Обработка клавиш + физики
 		go cameraObj.ProcessKeyboard(window, deltaTime, worldObj)
 		cameraObj.UpdatePhysics(deltaTime, worldObj)
@@ -108,10 +114,15 @@ func runMainLoop(
 		//print(render.Cunt_ch)
 		garbageCollector.VramGC(vramGCCh, &render.Cunt_ch)
 
-		dynamicLightPos := render.GetDynamicLightPos(cameraObj.Position)
+		if cameraObj.ShowInfoPanel {
+			print("HERE")
+			render.RenderText("AAAAAAAAAAAAAA", 0, 0, 1920, 1080, textProgram, [4]float32{1, 1, 1, 1})
+		}
+
+		dynamicLightPos := render.GetDynamicLightPos(cameraObj.Position, timeOfDay)
 
 		// 2) Ортопроекция вокруг игрока
-		lightProjection := render.GetLightProjection(cameraObj.Position)
+		lightProjection := render.GetLightProjection()
 
 		// 3) Направляем луч из динамического света к игроку
 		lightView := mgl32.LookAtV(dynamicLightPos, cameraObj.Position, lightUp)

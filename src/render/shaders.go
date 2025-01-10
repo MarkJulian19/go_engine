@@ -27,6 +27,15 @@ func InitDepthShader() uint32 {
 	return program
 }
 
+func InitTextShader() uint32 {
+	program, err := compileTextShader()
+	if err != nil {
+		log.Fatalln("Error compiling text shaders:", err)
+	}
+	gl.UseProgram(program)
+	return program
+}
+
 /*
 -----------------------------------------------------------------------------
 
@@ -161,7 +170,7 @@ float calculateShadow(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     float currentDepth = projCoords.z;
 
     // bias
-    float bias = max(0.001 * (1.0 - dot(normal, lightDir)), 0.0005);
+    float bias = max(0.00001 * (1.0 - dot(normal, lightDir)), 0.000005);
 
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     return shadow;
@@ -227,6 +236,40 @@ void main()
     vec3 finalColor = mix(fogColor, lightingColor, fogFactor);
 
     outputColor = vec4(finalColor, 1.0);
+}
+` + "\x00"
+	return compileProgram(vertexShaderSrc, fragmentShaderSrc)
+}
+
+func compileTextShader() (uint32, error) {
+	vertexShaderSrc := `#version 410 core
+
+layout(location = 0) in vec3 inPosition; // Позиция вершины
+layout(location = 1) in vec2 inTexCoord; // Координаты текстуры
+
+uniform mat4 ortho; // Ортографическая матрица
+
+out vec2 fragTexCoord; // Передача координат текстуры в фрагментный шейдер
+
+void main()
+{
+    fragTexCoord = inTexCoord;
+    gl_Position = ortho * vec4(inPosition, 1.0);
+}
+` + "\x00"
+
+	fragmentShaderSrc := `#version 410 core
+
+in vec2 fragTexCoord; // Координаты текстуры из вершинного шейдера
+uniform sampler2D textTexture; // Текстура с текстом
+uniform vec4 textColor; // Цвет текста (RGBA)
+
+out vec4 fragColor; // Итоговый цвет фрагмента
+
+void main()
+{
+    vec4 sampled = texture(textTexture, fragTexCoord); // Получаем цвет из текстуры
+    fragColor = vec4(textColor.rgb, sampled.r * textColor.a); // Применяем цвет текста и альфа-канал
 }
 ` + "\x00"
 

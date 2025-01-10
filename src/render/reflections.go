@@ -81,7 +81,7 @@ func RenderReflection(
 	setUniformMatrix4fv(program, "lightSpaceMatrix", lightSpaceMatrix)
 
 	// Направление света
-	lightDir := lightPos.Sub(mgl32.Vec3{0, 0, 0}).Normalize()
+	lightDir := lightPos.Sub(cameraObj.Position).Normalize()
 	lightDirLoc := gl.GetUniformLocation(program, gl.Str("lightDir\x00"))
 	gl.Uniform3f(lightDirLoc, lightDir.X(), lightDir.Y(), lightDir.Z())
 

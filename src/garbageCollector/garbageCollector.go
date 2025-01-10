@@ -10,7 +10,7 @@ func VramGC(vramGCCh chan [3]uint32, Cunt_ch *int) {
 		gl.DeleteVertexArrays(1, &x[0])
 		gl.DeleteBuffers(1, &x[1])
 		gl.DeleteBuffers(1, &x[2])
-		println(*Cunt_ch)
+		//println(*Cunt_ch)
 		*Cunt_ch--
 	}
 }

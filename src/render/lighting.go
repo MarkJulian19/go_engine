@@ -1,21 +1,22 @@
 package render
 
-import "github.com/go-gl/mathgl/mgl32"
+import (
+	"math"
 
-func GetLightProjection(playerPos mgl32.Vec3) mgl32.Mat4 {
-	// Допустим, хотим ±200 вокруг игрока
-	left := playerPos.X() - 200
-	right := playerPos.X() + 200
-	bottom := playerPos.Z() - 200
-	top := playerPos.Z() + 200
+	"github.com/go-gl/mathgl/mgl32"
+)
 
-	// Или Y можно взять в зависимости от высоты мира
-	return mgl32.Ortho(left, right, bottom, top, 0.1, 500.0)
+func GetLightProjection() mgl32.Mat4 {
+	size := float32(200.0)
+	near := float32(0.1)
+	far := float32(1000.0)
+	return mgl32.Ortho(-size, size, -size, size, near, far)
 }
-func GetDynamicLightPos(playerPos mgl32.Vec3) mgl32.Vec3 {
-	return mgl32.Vec3{
-		playerPos.X() + 100,
-		200,
-		playerPos.Z() + 100,
-	}
+func GetDynamicLightPos(playerPos mgl32.Vec3, timeOfDay float64) mgl32.Vec3 {
+	radius := float32(300.0) // Радиус вращения
+	height := float32(300.0) // Высота солнца
+	x := playerPos.X() + radius*float32(math.Cos(timeOfDay))
+	z := playerPos.Z() + radius*float32(math.Sin(timeOfDay))
+	y := playerPos.Y() + height
+	return mgl32.Vec3{x, y, z}
 }
