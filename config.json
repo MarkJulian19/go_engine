@@ -1,17 +1,17 @@
 {
     "ContextVersionMajor": 4,
     "ContextVersionMinor": 1,
-    "Width":   1920,
-	"Height":  1080,
+    "Width":   100,
+	"Height":  100,
 	"Title": "3D Engine",
-    "ChunkDist": 10,
+    "ChunkDist": 40,
     "NumWorkers": 8,
     "ChunkX":16,
-    "ChunkY":32,
+    "ChunkY":16,
     "ChunkZ":16,
     "FogStartLoc": 300.0,
     "FogEndLoc": 600.0,
-    "ShadowDist": 200.0,
+    "ShadowDist": 400.0,
     "ShadowWidth": 32000,
     "ShadowHeight": 32000
 }

@@ -18,7 +18,7 @@ func GetDynamicLightPos(playerPos mgl32.Vec3, timeOfDay float64) mgl32.Vec3 {
 	radius := float32(300.0) // Радиус вращения
 
 	heightScale := float32(650.0) // Максимальная высота солнца над горизонтом
-	baseHeight := float32(50.0)   // Базовая высота (горизонт или чуть ниже)
+	baseHeight := float32(100.0)  // Базовая высота (горизонт или чуть ниже)
 
 	// Вычисляем позицию солнца
 	x := playerPos.X() + radius*float32(math.Cos(timeOfDay))

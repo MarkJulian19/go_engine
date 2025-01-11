@@ -2,6 +2,7 @@ package world
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 
@@ -265,8 +266,11 @@ func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint
 
 func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.Noise) *Chunk {
 	blocks := make([]Block, sizeX*sizeY*sizeZ)
-	noiseScale := 100.0    // Масштаб шума для высоты
-	treeProbability := 0.1 // 10% шанс появления дерева на блоке травы
+	noiseScale := 100.0                   // Масштаб шума для базовой высоты
+	mountainScale := 200.0                // Масштаб шума для гор
+	riverNoiseScale := 300.0              // Масштаб шума для рек
+	biomeNoiseScale := 500.0              // Масштаб шума для биомов
+	seaLevel := int(float64(sizeY) * 0.3) // Уровень моря (30% от высоты мира)
 
 	for x := 0; x < sizeX; x++ {
 		for z := 0; z < sizeZ; z++ {
@@ -274,28 +278,59 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.N
 			absoluteX := x + offsetX*sizeX
 			absoluteZ := z + offsetZ*sizeZ
 
-			// Генерация высоты
+			// Генерация биома
+			biomeNoise := noise.Eval2(float64(absoluteX)/biomeNoiseScale, float64(absoluteZ)/biomeNoiseScale)
+			biome := determineBiome(biomeNoise)
+
+			// Генерация базовой высоты
 			baseHeight := noise.Eval2(float64(absoluteX)/noiseScale, float64(absoluteZ)/noiseScale)
-			height := int((baseHeight + 1.0) * 0.5 * float64(sizeY-1)) // Нормализация в диапазон чанка
+			height := int((baseHeight + 1.0) * 0.3 * float64(sizeY-1)) // Высота ограничена 30% от размера чанка
+
+			// Добавление гор
+			if biome == "mountains" {
+				mountainHeight := noise.Eval2(float64(absoluteX)/mountainScale, float64(absoluteZ)/mountainScale)
+				height += int((mountainHeight + 1.0) * 0.4 * float64(sizeY-1)) // Горы добавляют до 40% высоты
+			}
+
+			// Генерация рек
+			riverNoise := noise.Eval2(float64(absoluteX)/riverNoiseScale, float64(absoluteZ)/riverNoiseScale)
+			isRiver := math.Abs(riverNoise) < 0.1 // Порог для реки
 
 			for y := 0; y < sizeY; y++ {
 				idx := blockIndex(x, y, z, sizeX, sizeY, sizeZ)
-				if y < height {
-					// Подземные блоки — камень
+
+				if isRiver && y < seaLevel {
+					// Река заполняет блоки ниже уровня моря
 					blocks[idx] = Block{
-						Id:    3,
-						Color: [3]float32{0.5, 0.5, 0.5},
+						Id:    7, // ID воды
+						Color: [3]float32{0.0, 0.0, 1.0},
+					}
+					continue
+				}
+
+				if y < height {
+					// Заполнение горных биомов плотными блоками
+					if biome == "mountains" && y > height-5 {
+						blocks[idx] = Block{
+							Id:    10, // Каменные вершины
+							Color: [3]float32{0.7, 0.7, 0.7},
+						}
+					} else {
+						blocks[idx] = generateUndergroundBlock(y, height, biome)
 					}
 				} else if y == height {
-					// Верхний слой — трава
-					blocks[idx] = Block{
-						Id:    2,
-						Color: [3]float32{0.1, 0.8, 0.1},
-					}
+					// Верхний слой в зависимости от биома
+					blocks[idx] = generateSurfaceBlock(biome)
 
-					// Пытаемся сгенерировать дерево
-					if rand.Float64() < treeProbability {
+					// Случайное дерево или растение
+					if biome == "forest" && rand.Float64() < 0.1 {
 						placeMinecraftTree(blocks, x, y+1, z, sizeX, sizeY, sizeZ)
+					}
+				} else if y <= seaLevel {
+					// Вода ниже уровня моря
+					blocks[idx] = Block{
+						Id:    7, // ID воды
+						Color: [3]float32{0.0, 0.0, 1.0},
 					}
 				} else {
 					// Воздух
@@ -316,67 +351,73 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.N
 	}
 }
 
-// placeMinecraftTree: Сгенерировать простой «дуб» как в Minecraft
-func placeMinecraftTree(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
-	// Случайная высота ствола (обычно 4-7 блоков)
-	trunkHeight := 4 + rand.Intn(4) // от 4 до 7
+func determineBiome(noiseValue float64) string {
+	if noiseValue < -0.3 {
+		return "desert"
+	} else if noiseValue < 0.0 {
+		return "plains"
+	} else if noiseValue < 0.3 {
+		return "forest"
+	}
+	return "mountains"
+}
 
-	// Ставим ствол
+func generateUndergroundBlock(y, height int, biome string) Block {
+	if biome == "desert" {
+		return Block{Id: 8, Color: [3]float32{0.9, 0.8, 0.4}} // Песок
+	}
+	return Block{Id: 3, Color: [3]float32{0.5, 0.5, 0.5}} // Камень
+}
+
+func generateSurfaceBlock(biome string) Block {
+	switch biome {
+	case "desert":
+		return Block{Id: 8, Color: [3]float32{0.9, 0.8, 0.4}} // Песок
+	case "forest":
+		return Block{Id: 2, Color: [3]float32{0.1, 0.8, 0.1}} // Трава
+	case "plains":
+		return Block{Id: 9, Color: [3]float32{0.4, 0.7, 0.1}} // Луга
+	case "mountains":
+		return Block{Id: 10, Color: [3]float32{0.7, 0.7, 0.7}} // Каменные вершины
+	}
+	return Block{Id: 2, Color: [3]float32{0.1, 0.8, 0.1}}
+}
+
+func placeMinecraftTree(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
+	trunkHeight := 4 + rand.Intn(4) // Случайная высота ствола
+
+	// Генерация ствола
 	for i := 0; i < trunkHeight; i++ {
 		yy := y + i
-		if yy >= sizeY { // Если ствол выходит за границу чанка, прекращаем
+		if yy >= sizeY {
 			break
 		}
 		idx := blockIndex(x, yy, z, sizeX, sizeY, sizeZ)
-		if idx >= 0 && idx < len(blocks) { // Убедимся, что индекс в пределах массива
-			// fmt.Printf("%d %d %d\n", x, yy, z)
+		if idx >= 0 && idx < len(blocks) {
 			blocks[idx] = Block{
-				Id:    5,                         // ID для «брёвен»
-				Color: [3]float32{0.6, 0.3, 0.1}, // Коричневый
+				Id:    5, // ID ствола
+				Color: [3]float32{0.6, 0.3, 0.1},
 			}
 		}
 	}
 
-	// Верх ствола (где начинаются листья)
-	treetopY := y + trunkHeight
-	if treetopY >= sizeY { // Если крона выходит за пределы чанка, не создаем её
-		return
-	}
+	// Генерация кроны
+	generateLeaves(blocks, x, y+trunkHeight, z, sizeX, sizeY, sizeZ)
+}
 
-	// Генерация кроны дерева
+func generateLeaves(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
 	leafRadius := 2
-	leafHeight := 3 + rand.Intn(2) // Высота кроны от 3 до 4 блоков
+	leafHeight := 3 + rand.Intn(2)
 	for dy := 0; dy < leafHeight; dy++ {
-		yy := treetopY + dy
-		if yy >= sizeY { // Выход за верхнюю границу чанка
-			break
-		}
-
-		// Радиус листьев уменьшается к верхушке
-		levelRadius := leafRadius
-		if dy == leafHeight-1 {
-			levelRadius = leafRadius - 1
-			if levelRadius < 1 {
-				levelRadius = 1
-			}
-		}
-
-		for dx := -levelRadius; dx <= levelRadius; dx++ {
-			for dz := -levelRadius; dz <= levelRadius; dz++ {
-				nx := x + dx
-				nz := z + dz
-
-				// Проверяем границы чанка
-				if nx < 0 || nx >= sizeX || nz < 0 || nz >= sizeZ {
-					continue
-				}
-
-				// Проверяем форму кроны (окружность)
-				if dx*dx+dz*dz <= levelRadius*levelRadius {
+		yy := y + dy
+		for dx := -leafRadius; dx <= leafRadius; dx++ {
+			for dz := -leafRadius; dz <= leafRadius; dz++ {
+				nx, nz := x+dx, z+dz
+				if dx*dx+dz*dz <= leafRadius*leafRadius {
 					idx := blockIndex(nx, yy, nz, sizeX, sizeY, sizeZ)
-					if idx >= 0 && idx < len(blocks) && blocks[idx].Id == 0 { // Ставим листья только на воздух
+					if idx >= 0 && idx < len(blocks) && blocks[idx].Id == 0 {
 						blocks[idx] = Block{
-							Id:    6, // ID для «листвы»
+							Id:    6, // ID листвы
 							Color: [3]float32{0.0 + 0.3*rand.Float32(), 0.8 + 0.2*rand.Float32(), 0.0 + 0.3*rand.Float32()},
 						}
 					}
@@ -678,4 +719,48 @@ func (w *World) GetBlock(x, y, z int) Block {
 	// Индекс в одномерном массиве
 	idx := blockIndex(lx, y, lz, chunk.SizeX, chunk.SizeY, chunk.SizeZ)
 	return chunk.Blocks[idx]
+}
+
+func (w *World) SetBlock(x, y, z int, block Block) {
+	// Проверяем, что координаты в допустимых пределах
+	if y < 0 || y >= w.SizeY {
+		return
+	}
+	// Координаты чанка
+	cx := x / w.SizeX
+	cz := z / w.SizeZ
+
+	// Локальные координаты внутри чанка
+	lx := x % w.SizeX
+	lz := z % w.SizeZ
+	if lx < 0 {
+		lx += w.SizeX
+		cx -= 1
+	}
+	if lz < 0 {
+		lz += w.SizeZ
+		cz -= 1
+	}
+
+	chunkCoord := [2]int{cx, cz}
+
+	w.Mu.Lock()
+	defer w.Mu.Unlock()
+
+	chunk, exists := w.Chunks[chunkCoord]
+	if !exists {
+		return
+	}
+
+	idx := blockIndex(lx, y, lz, chunk.SizeX, chunk.SizeY, chunk.SizeZ)
+	chunk.Blocks[idx] = block
+
+	// Устанавливаем флаг обновления меша
+	neighbors := w.collectNeighbors(cx, cz)
+	chunk.UpdateBuffers(neighbors)
+}
+
+// RemoveBlock удаляет блок по мировым координатам (ставит воздух)
+func (w *World) RemoveBlock(x, y, z int) {
+	w.SetBlock(x, y, z, Block{Id: 0})
 }

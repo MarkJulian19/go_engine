@@ -43,7 +43,7 @@ func RunMainLoop(
 		// Обработка клавиш и физики
 		cameraObj.ProcessKeyboard(window, deltaTime, worldObj)
 		cameraObj.UpdatePhysics(deltaTime, worldObj)
-
+		cameraObj.InteractWithBlock(window, worldObj)
 		// Обновляем мир (генерация / удаление чанков)
 
 		// Освобождаем буферы из VRAM
