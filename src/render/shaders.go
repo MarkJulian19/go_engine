@@ -170,7 +170,7 @@ float calculateShadow(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     float currentDepth = projCoords.z;
 
     // bias
-    float bias = max(0.00001 * (1.0 - dot(normal, lightDir)), 0.000005);
+    float bias = max(0.0001 * (1.0 - dot(normal, lightDir)), 0.000001);
 
     float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     return shadow;
@@ -268,8 +268,8 @@ out vec4 fragColor; // Итоговый цвет фрагмента
 
 void main()
 {
-    vec4 sampled = texture(textTexture, fragTexCoord); // Получаем цвет из текстуры
-    fragColor = vec4(textColor.rgb, sampled.r * textColor.a); // Применяем цвет текста и альфа-канал
+    vec4 sampled = texture(textTexture, fragTexCoord);
+    fragColor = vec4(textColor.rgb, sampled.a * textColor.a);
 }
 ` + "\x00"
 

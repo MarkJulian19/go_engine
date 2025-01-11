@@ -7,7 +7,7 @@ import (
 )
 
 func GetLightProjection() mgl32.Mat4 {
-	size := float32(200.0)
+	size := float32(100.0)
 	near := float32(0.1)
 	far := float32(1000.0)
 	return mgl32.Ortho(-size, size, -size, size, near, far)

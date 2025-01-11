@@ -40,7 +40,7 @@ func setupCommonUniforms(program uint32, cameraPos mgl32.Vec3) {
 	fogColorLoc := gl.GetUniformLocation(program, gl.Str("fogColor\x00"))
 
 	gl.Uniform1f(fogStartLoc, 50.0)
-	gl.Uniform1f(fogEndLoc, 300.0)
+	gl.Uniform1f(fogEndLoc, 200.0)
 	gl.Uniform3f(fogColorLoc, 0.6, 0.7, 0.9)
 }
 

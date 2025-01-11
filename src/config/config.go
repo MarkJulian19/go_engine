@@ -14,6 +14,8 @@ type Config struct {
 	Width               int    `json:"Width"`
 	Height              int    `json:"Height"`
 	Title               string `json:"Title"`
+	ChunkDist           int    `json:"ChunkDist"`
+	NumWorkers          int    `json:"NumWorkers"`
 }
 
 func LoadConfigFromFile(filePath string) (*Config, error) {
