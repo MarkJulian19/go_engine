@@ -47,7 +47,7 @@ func NewCamera(position mgl32.Vec3) *Camera {
 		Position:      position,
 		Yaw:           -90.0,
 		Pitch:         0.0,
-		Speed:         25.0,
+		Speed:         15.0,
 		Sensitivity:   0.05,
 		velocityY:     0,
 		isOnGround:    false,
@@ -268,7 +268,7 @@ func isSolidAt(w *world.World, fx, fy, fz float64) bool {
 	z := int(math.Floor(float64(fz)))
 
 	if y < 0 || y >= w.SizeY {
-		return true
+		return false
 	}
 	block := w.GetBlock(x, y, z)
 	return block.Id != 0
@@ -277,7 +277,7 @@ func (cam *Camera) InteractWithBlock(window *glfw.Window, w *world.World) {
 	// Проверяем нажатие левой кнопки мыши для удаления блока
 	if window.GetMouseButton(glfw.MouseButtonLeft) == glfw.Press {
 		currentTime := time.Now()
-		if currentTime.Sub(cam.lastPlaceAction) < 250*time.Millisecond {
+		if currentTime.Sub(cam.lastPlaceAction) < 100*time.Millisecond {
 			// Если прошло меньше 500 мс, блок не ставится
 			return
 		}
@@ -294,7 +294,7 @@ func (cam *Camera) InteractWithBlock(window *glfw.Window, w *world.World) {
 	// Проверяем нажатие правой кнопки мыши для добавления блока
 	if window.GetMouseButton(glfw.MouseButtonRight) == glfw.Press {
 		currentTime := time.Now()
-		if currentTime.Sub(cam.lastPlaceAction) < 250*time.Millisecond {
+		if currentTime.Sub(cam.lastPlaceAction) < 100*time.Millisecond {
 			// Если прошло меньше 500 мс, блок не ставится
 			return
 		}

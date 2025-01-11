@@ -745,19 +745,28 @@ func (w *World) SetBlock(x, y, z int, block Block) {
 	chunkCoord := [2]int{cx, cz}
 
 	w.Mu.Lock()
-	defer w.Mu.Unlock()
 
 	chunk, exists := w.Chunks[chunkCoord]
 	if !exists {
 		return
 	}
-
+	w.Mu.Unlock()
 	idx := blockIndex(lx, y, lz, chunk.SizeX, chunk.SizeY, chunk.SizeZ)
 	chunk.Blocks[idx] = block
 
 	// Устанавливаем флаг обновления меша
+	w.Mu.Lock()
 	neighbors := w.collectNeighbors(cx, cz)
 	chunk.UpdateBuffers(neighbors)
+	w.Mu.Unlock()
+	for direction, neighbor := range neighbors {
+		if neighbor != nil {
+			w.Mu.Lock()
+			updatedNeighbors := w.collectNeighbors(cx+offsets[direction][0], cz+offsets[direction][1])
+			w.Mu.Unlock()
+			neighbor.UpdateBuffers(updatedNeighbors)
+		}
+	}
 }
 
 // RemoveBlock удаляет блок по мировым координатам (ставит воздух)
