@@ -1,7 +1,6 @@
 package world
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -201,60 +200,46 @@ func (chunk *Chunk) UpdateBuffers(neighbors map[string]*Chunk) {
 
 // Генерирует меш чанка
 func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint32) {
-	var vertices []float32 // здесь будем класть по 9 float на вершину
-	var indices []uint32
+	var vertices []float32 // Вершины
+	var indices []uint32   // Индексы
 
-	for x := 0; x < chunk.SizeX; x++ {
-		for y := 0; y < chunk.SizeY; y++ {
-			for z := 0; z < chunk.SizeZ; z++ {
+	for _, face := range cubeFaces {
+		visited := make(map[[3]int]bool) // Помечаем уже обработанные блоки
 
-				block := chunk.Blocks[blockIndex(x, y, z, chunk.SizeX, chunk.SizeY, chunk.SizeZ)]
-				if block.Id == 0 {
-					continue // Воздух не рисуем
-				}
-				if block.Id == 5 {
-					fmt.Println(5) // Воздух не рисуем
-				}
-
-				// Для каждой из 6 граней куба
-				for _, face := range cubeFaces {
-					if y == 0 && face.OffsetY == -1 {
+		for x := 0; x < chunk.SizeX; x++ {
+			for y := 0; y < chunk.SizeY; y++ {
+				for z := 0; z < chunk.SizeZ; z++ {
+					block := chunk.Blocks[blockIndex(x, y, z, chunk.SizeX, chunk.SizeY, chunk.SizeZ)]
+					if block.Id == 0 || visited[[3]int{x, y, z}] {
 						continue
 					}
-					nx, ny, nz := x+face.OffsetX, y+face.OffsetY, z+face.OffsetZ
-					if IsAirWithNeighbors(chunk, nx, ny, nz, neighbors) {
 
-						// Нормаль этой грани:
-						// face.OffsetX, face.OffsetY, face.OffsetZ
-						// (для куба это 0,0,1 или -1,0,0 и т.д.)
-						normX := float32(face.OffsetX)
-						normY := float32(face.OffsetY)
-						normZ := float32(face.OffsetZ)
-
-						// Для удобства
-						r := block.Color[0]
-						g := block.Color[1]
-						b := block.Color[2]
+					// Если грань "воздушная", объединяем
+					if IsAirWithNeighbors(chunk, x+face.OffsetX, y+face.OffsetY, z+face.OffsetZ, neighbors) {
+						width, height := findQuad(chunk, x, y, z, face.OffsetX, face.OffsetY, face.OffsetZ, block.Id, visited)
 
 						startIdx := uint32(len(vertices) / 9)
-						// т.к. теперь 9 float на вершину
+						r, g, b := block.Color[0], block.Color[1], block.Color[2]
 
-						// Добавляем 4 вершины (квадрат)
-						for _, vtx := range face.Vertices {
-							px := float32(x) + vtx[0]
-							py := float32(y) + vtx[1]
-							pz := float32(z) + vtx[2]
+						// Координаты вершин
+						v1 := [3]float32{float32(x), float32(y), float32(z)}
+						v2 := [3]float32{float32(x + width), float32(y), float32(z)}
+						v3 := [3]float32{float32(x + width), float32(y + height), float32(z)}
+						v4 := [3]float32{float32(x), float32(y + height), float32(z)}
 
-							vertices = append(vertices,
-								px, py, pz, // позиция
-								normX, normY, normZ, // нормаль
-								r, g, b) // цвет
-						}
+						// Добавляем вершины
+						vertices = append(vertices,
+							v1[0], v1[1], v1[2], float32(face.OffsetX), float32(face.OffsetY), float32(face.OffsetZ), r, g, b,
+							v2[0], v2[1], v2[2], float32(face.OffsetX), float32(face.OffsetY), float32(face.OffsetZ), r, g, b,
+							v3[0], v3[1], v3[2], float32(face.OffsetX), float32(face.OffsetY), float32(face.OffsetZ), r, g, b,
+							v4[0], v4[1], v4[2], float32(face.OffsetX), float32(face.OffsetY), float32(face.OffsetZ), r, g, b,
+						)
 
-						// Индексы
+						// Добавляем индексы
 						indices = append(indices,
 							startIdx+0, startIdx+1, startIdx+2,
-							startIdx+2, startIdx+3, startIdx+0)
+							startIdx+2, startIdx+3, startIdx+0,
+						)
 					}
 				}
 			}
@@ -262,6 +247,38 @@ func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint
 	}
 
 	return vertices, indices
+}
+
+// Поиск объединяемой области (ширина и высота)
+func findQuad(chunk *Chunk, startX, startY, startZ, offsetX, offsetY, offsetZ int, blockId uint8, visited map[[3]int]bool) (int, int) {
+	width, height := 0, 0
+
+	// Находим ширину
+	for x := startX; x < chunk.SizeX; x++ {
+		if chunk.Blocks[blockIndex(x, startY, startZ, chunk.SizeX, chunk.SizeY, chunk.SizeZ)].Id != blockId {
+			break
+		}
+		width++
+	}
+
+	// Находим высоту
+	for y := startY; y < chunk.SizeY; y++ {
+		for x := startX; x < startX+width; x++ {
+			if chunk.Blocks[blockIndex(x, y, startZ, chunk.SizeX, chunk.SizeY, chunk.SizeZ)].Id != blockId {
+				return width, height
+			}
+		}
+		height++
+	}
+
+	// Помечаем обработанные блоки
+	for x := startX; x < startX+width; x++ {
+		for y := startY; y < startY+height; y++ {
+			visited[[3]int{x, y, startZ}] = true
+		}
+	}
+
+	return width, height
 }
 
 func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.Noise) *Chunk {
