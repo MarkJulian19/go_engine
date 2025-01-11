@@ -51,11 +51,11 @@ func RunMainLoop(
 
 		// Рендер теней, отражений и сцены
 		dynamicLightPos := render.GetDynamicLightPos(cameraObj.Position, timeOfDay)
-		lightProjection := render.GetLightProjection()
+		lightProjection := render.GetLightProjection(config)
 		lightView := mgl32.LookAtV(dynamicLightPos, cameraObj.Position, lightUp)
 		lightSpaceMatrix := lightProjection.Mul4(lightView)
 
-		render.RenderDepthMap(depthProgram, worldObj, lightSpaceMatrix)
+		render.RenderDepthMap(depthProgram, worldObj, lightSpaceMatrix, config)
 		render.RenderReflection(renderProgram, config, worldObj, cameraObj, lightSpaceMatrix, dynamicLightPos)
 		render.RenderScene(window, renderProgram, config, worldObj, cameraObj, lightSpaceMatrix, dynamicLightPos, deltaTime, textProgram)
 	}

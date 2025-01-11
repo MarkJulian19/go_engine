@@ -39,21 +39,21 @@ func main() {
 	textProgram := render.InitTextShader()
 
 	// Создаём FBO и текстуру для карты теней
-	render.CreateDepthMap()
+	render.CreateDepthMap(Config)
 
 	// Создаём FBO и текстуру для отражений
-	render.CreateReflectionFBO()
+	render.CreateReflectionFBO(Config)
 
 	// Настраиваем мир и камеру
-	worldObj := world.NewWorld(16, 128, 16)
-	cameraObj := camera.NewCamera(mgl32.Vec3{0, 60, 0})
+	worldObj := world.NewWorld(Config.ChunkX, Config.ChunkY, Config.ChunkZ)
+	cameraObj := camera.NewCamera(mgl32.Vec3{0, 120, 0})
 
 	chunkGenCh := make(chan [2]int, 100)
 	chunkDelCh := make(chan [2]int, 1000000)
 	vramGCCh := make(chan [3]uint32, 1000000)
 	workers.UpdateWorld(worldObj, cameraObj, chunkGenCh, chunkDelCh, Config)
 	for i := 0; i < Config.NumWorkers; i++ {
-		workers.ChunkСreatorWorker(worldObj, chunkGenCh, chunkDelCh, vramGCCh)
+		workers.ChunkCreatorWorker(worldObj, chunkGenCh, chunkDelCh, vramGCCh)
 		workers.ChunkDeleterWorker(worldObj, chunkGenCh, chunkDelCh, vramGCCh)
 	}
 	workers.InitMouseHandler(window, cameraObj)

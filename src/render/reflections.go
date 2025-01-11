@@ -10,7 +10,7 @@ import (
 )
 
 // Текстура и FBO для «зеркального» отражения
-func CreateReflectionFBO() {
+func CreateReflectionFBO(Config *config.Config) {
 	gl.GenFramebuffers(1, &reflectionFBO)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, reflectionFBO)
 
@@ -86,7 +86,7 @@ func RenderReflection(
 	gl.Uniform3f(lightDirLoc, lightDir.X(), lightDir.Y(), lightDir.Z())
 
 	// Остальные uniform’ы (тени, туман и т.д.)
-	setupCommonUniforms(program, cameraObj.Position)
+	setupCommonUniforms(program, cameraObj.Position, config)
 
 	// Привязываем shadowMap
 	gl.ActiveTexture(gl.TEXTURE1)

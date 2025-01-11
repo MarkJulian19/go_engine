@@ -4,12 +4,15 @@ import (
 	"engine/src/camera"
 	"engine/src/config"
 	"engine/src/world"
+	"fmt"
+	"runtime"
 	"time"
 
+	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-func ChunkСreatorWorker(w *world.World, genCh, delCh <-chan [2]int, vramCh chan [3]uint32) {
+func ChunkCreatorWorker(w *world.World, genCh, delCh <-chan [2]int, vramCh chan [3]uint32) {
 	go func() {
 		for {
 
@@ -61,6 +64,45 @@ func InitMouseHandler(window *glfw.Window, camera *camera.Camera) {
 			xpos, ypos := window.GetCursorPos()
 			camera.ProcessMouse(xpos, ypos)
 			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+}
+func MonitorMemoryStats(
+	cameraObj *camera.Camera,
+	worldObj *world.World,
+	deltaTime float64,
+	memStatsCh chan<- []string,
+) {
+	go func() {
+		ticker := time.NewTicker(time.Second / 12) // Обновление 12 раз в секунду
+		defer ticker.Stop()
+
+		for range ticker.C {
+			var memStats runtime.MemStats
+			runtime.ReadMemStats(&memStats)
+
+			// Замер видеопамяти
+			var totalVRAM, availableVRAM int32
+			gl.GetIntegerv(0x9048 /* GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX */, &totalVRAM)
+			gl.GetIntegerv(0x9049 /* GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX */, &availableVRAM)
+
+			var usedVRAM int32
+			if totalVRAM > 0 {
+				usedVRAM = totalVRAM - availableVRAM
+			}
+
+			debugInfo := []string{
+				fmt.Sprintf("FPS: %.2f", 1.0/deltaTime),
+				fmt.Sprintf("Camera Position: X=%.2f Y=%.2f Z=%.2f", cameraObj.Position.X(), cameraObj.Position.Y(), cameraObj.Position.Z()),
+				fmt.Sprintf("Chunks Loaded: %d", len(worldObj.Chunks)),
+				fmt.Sprintf("Allocated RAM: %.2f MB", float64(memStats.Alloc)/1024/1024),
+				fmt.Sprintf("Total Allocated RAM: %.2f MB", float64(memStats.TotalAlloc)/1024/1024),
+				fmt.Sprintf("System RAM: %.2f MB", float64(memStats.Sys)/1024/1024),
+				fmt.Sprintf("Total VRAM: %.2f MB", float64(totalVRAM)/1024),
+				fmt.Sprintf("Used VRAM: %.2f MB", float64(usedVRAM)/1024),
+			}
+
+			memStatsCh <- debugInfo // Отправляем данные в канал
 		}
 	}()
 }

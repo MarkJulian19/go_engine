@@ -1,9 +1,13 @@
 package render
 
 import (
+	"engine/src/camera"
+	"engine/src/world"
+	"fmt"
 	"image"
 	"image/draw"
 	"log"
+	"runtime"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -148,4 +152,27 @@ func renderTexturedQuad(texture uint32, x, y, width, height float32) {
 	gl.DeleteBuffers(1, &vbo)
 	gl.DeleteBuffers(1, &ebo)
 	gl.DeleteVertexArrays(1, &vao)
+}
+func Get_hud_info(deltaTime float64, worldObj *world.World, cameraObj *camera.Camera) []string {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	// Замер видеопамяти
+	var totalVRAM, availableVRAM int32
+	gl.GetIntegerv(0x9048 /* GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX */, &totalVRAM)       // Общее количество VRAM
+	gl.GetIntegerv(0x9049 /* GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX */, &availableVRAM) // Доступная VRAM
+	var usedVRAM int32
+	if totalVRAM > 0 {
+		usedVRAM = totalVRAM - availableVRAM
+	}
+	return []string{
+		fmt.Sprintf("FPS: %.2f", 1.0/deltaTime),
+		fmt.Sprintf("Camera Position: X=%.2f Y=%.2f Z=%.2f", cameraObj.Position.X(), cameraObj.Position.Y(), cameraObj.Position.Z()),
+		fmt.Sprintf("Chunks Loaded: %d", len(worldObj.Chunks)),
+		fmt.Sprintf("Allocated RAM: %.2f MB", float64(memStats.Alloc)/1024/1024),
+		fmt.Sprintf("Total Allocated RAM: %.2f MB", float64(memStats.TotalAlloc)/1024/1024),
+		fmt.Sprintf("System RAM: %.2f MB", float64(memStats.Sys)/1024/1024),
+		fmt.Sprintf("Total VRAM: %.2f MB", float64(totalVRAM)/1024),
+		fmt.Sprintf("Used VRAM: %.2f MB", float64(usedVRAM)/1024),
+	}
 }

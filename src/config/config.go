@@ -9,13 +9,21 @@ import (
 )
 
 type Config struct {
-	ContextVersionMajor int    `json:"ContextVersionMajor"`
-	ContextVersionMinor int    `json:"ContextVersionMinor"`
-	Width               int    `json:"Width"`
-	Height              int    `json:"Height"`
-	Title               string `json:"Title"`
-	ChunkDist           int    `json:"ChunkDist"`
-	NumWorkers          int    `json:"NumWorkers"`
+	ContextVersionMajor int     `json:"ContextVersionMajor"`
+	ContextVersionMinor int     `json:"ContextVersionMinor"`
+	Width               int     `json:"Width"`
+	Height              int     `json:"Height"`
+	Title               string  `json:"Title"`
+	ChunkDist           int     `json:"ChunkDist"`
+	NumWorkers          int     `json:"NumWorkers"`
+	ChunkX              int     `json:"ChunkX"`
+	ChunkY              int     `json:"ChunkY"`
+	ChunkZ              int     `json:"ChunkZ"`
+	FogStartLoc         float32 `json:"FogStartLoc"`
+	FogEndLoc           float32 `json:"FogEndLoc"`
+	ShadowDist          float32 `json:"ShadowDist"`
+	ShadowHeight        int32   `json:"ShadowHeight"`
+	ShadowWidth         int32   `json:"ShadowWidth"`
 }
 
 func LoadConfigFromFile(filePath string) (*Config, error) {

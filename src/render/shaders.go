@@ -157,22 +157,33 @@ uniform sampler2D reflectionMap;
 float calculateShadow(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-    projCoords = projCoords * 0.5 + 0.5;
+    projCoords = projCoords * 0.5 + 0.5; // Приводим координаты в диапазон [0, 1]
 
-    if(projCoords.x < 0.0 || projCoords.x > 1.0 ||
-       projCoords.y < 0.0 || projCoords.y > 1.0 ||
-       projCoords.z > 1.0)
+    // Проверка выхода за пределы shadow map
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0 ||
+        projCoords.z > 1.0)
     {
-        return 0.0;
+        return 0.0; // Нет теней вне shadow map
     }
 
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
+    float closestDepth = texture(shadowMap, projCoords.xy).r; // Глубина из shadow map
     float currentDepth = projCoords.z;
 
-    // bias
-    float bias = max(0.0001 * (1.0 - dot(normal, lightDir)), 0.000001);
+    // Динамический bias для устранения самошейдинга
+    float bias = max(0.00005 * (1.0 - dot(normal, lightDir)), 0.00001);
+    //float bias = 0.00001; 
+    // Применение PCF (Percentage Closer Filtering)
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0); // Размер одного текселя
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0; // Усредняем значение теней
 
-    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
     return shadow;
 }
 

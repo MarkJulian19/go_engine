@@ -1,6 +1,7 @@
 package render
 
 import (
+	"engine/src/config"
 	"engine/src/world"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -16,7 +17,7 @@ func setUniformMatrix4fv(program uint32, name string, matrix mgl32.Mat4) {
 	gl.UniformMatrix4fv(loc, 1, false, &matrix[0])
 }
 
-func setupCommonUniforms(program uint32, cameraPos mgl32.Vec3) {
+func setupCommonUniforms(program uint32, cameraPos mgl32.Vec3, Config *config.Config) {
 	// Цвет/интенсивность света, ambient и т.д.
 	lightColorLoc := gl.GetUniformLocation(program, gl.Str("lightColor\x00"))
 	gl.Uniform3f(lightColorLoc, 1.0, 1.0, 1.0)
@@ -39,8 +40,8 @@ func setupCommonUniforms(program uint32, cameraPos mgl32.Vec3) {
 	fogEndLoc := gl.GetUniformLocation(program, gl.Str("fogEnd\x00"))
 	fogColorLoc := gl.GetUniformLocation(program, gl.Str("fogColor\x00"))
 
-	gl.Uniform1f(fogStartLoc, 50.0)
-	gl.Uniform1f(fogEndLoc, 200.0)
+	gl.Uniform1f(fogStartLoc, Config.FogStartLoc)
+	gl.Uniform1f(fogEndLoc, Config.FogEndLoc)
 	gl.Uniform3f(fogColorLoc, 0.6, 0.7, 0.9)
 }
 

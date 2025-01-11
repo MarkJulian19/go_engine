@@ -4,6 +4,14 @@
     "Width":   1920,
 	"Height":  1080,
 	"Title": "3D Engine",
-    "ChunkDist": 12,
-    "NumWorkers": 8
+    "ChunkDist": 10,
+    "NumWorkers": 8,
+    "ChunkX":16,
+    "ChunkY":32,
+    "ChunkZ":16,
+    "FogStartLoc": 300.0,
+    "FogEndLoc": 600.0,
+    "ShadowDist": 200.0,
+    "ShadowWidth": 32000,
+    "ShadowHeight": 32000
 }

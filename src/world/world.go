@@ -1,6 +1,7 @@
 package world
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 
@@ -210,9 +211,15 @@ func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint
 				if block.Id == 0 {
 					continue // Воздух не рисуем
 				}
+				if block.Id == 5 {
+					fmt.Println(5) // Воздух не рисуем
+				}
 
 				// Для каждой из 6 граней куба
 				for _, face := range cubeFaces {
+					if y == 0 && face.OffsetY == -1 {
+						continue
+					}
 					nx, ny, nz := x+face.OffsetX, y+face.OffsetY, z+face.OffsetZ
 					if IsAirWithNeighbors(chunk, nx, ny, nz, neighbors) {
 
@@ -258,62 +265,37 @@ func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint
 
 func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.Noise) *Chunk {
 	blocks := make([]Block, sizeX*sizeY*sizeZ)
-	noiseScale := 100.0 // Масштаб шума
-	biomeScale := 100.0 // Масштаб для биомов
+	noiseScale := 100.0    // Масштаб шума для высоты
+	treeProbability := 0.1 // 10% шанс появления дерева на блоке травы
 
-	// var wg sync.WaitGroup
-	// numWorkers := runtime.NumCPU() // Количество воркеров = количество ядер
-	// workQueue := make(chan int, sizeX)
-
-	// // Worker function
-	// worker := func() {
-	// 	defer wg.Done()
-	// 	for x := range workQueue {
 	for x := 0; x < sizeX; x++ {
-
 		for z := 0; z < sizeZ; z++ {
-			// Глобальные координаты
+			// Координаты в мире
 			absoluteX := x + offsetX*sizeX
 			absoluteZ := z + offsetZ*sizeZ
 
-			// Генерация высоты с использованием шума
+			// Генерация высоты
 			baseHeight := noise.Eval2(float64(absoluteX)/noiseScale, float64(absoluteZ)/noiseScale)
-			detailHeight := noise.Eval2(float64(absoluteX)/(noiseScale/2), float64(absoluteZ)/(noiseScale/2)) * 0.25
-			height := int((baseHeight + detailHeight + 1) * 0.5 * float64(sizeY-1))
-
-			// Генерация типа биома (пустыня, лес, горы)
-			biomeValue := noise.Eval2(float64(absoluteX)/biomeScale, float64(absoluteZ)/biomeScale)
+			height := int((baseHeight + 1.0) * 0.5 * float64(sizeY-1)) // Нормализация в диапазон чанка
 
 			for y := 0; y < sizeY; y++ {
 				idx := blockIndex(x, y, z, sizeX, sizeY, sizeZ)
+				if y < height {
+					// Подземные блоки — камень
+					blocks[idx] = Block{
+						Id:    3,
+						Color: [3]float32{0.5, 0.5, 0.5},
+					}
+				} else if y == height {
+					// Верхний слой — трава
+					blocks[idx] = Block{
+						Id:    2,
+						Color: [3]float32{0.1, 0.8, 0.1},
+					}
 
-				if y <= height {
-					switch {
-					// case absoluteX%5 != 0:
-					// 	blocks[idx] = Block{
-					// 		Id:    0,
-					// 		Color: [3]float32{0.1 + 0.3*rand.Float32(), 0.8 + 0.2*rand.Float32(), 0.1 + 0.3*rand.Float32()},
-					// 	}
-					case biomeValue > 0.3 && y == height: // Лес, верхний слой — трава
-						blocks[idx] = Block{
-							Id:    2,
-							Color: [3]float32{0.1 + 0.3*rand.Float32(), 0.8 + 0.2*rand.Float32(), 0.1 + 0.3*rand.Float32()},
-						}
-					case biomeValue <= 0.3 && y == height: // Пустыня, верхний слой — песок
-						blocks[idx] = Block{
-							Id:    4,
-							Color: [3]float32{0.9 * float32(y) / float32(sizeY), 0.8 * float32(y) / float32(sizeY), 0.5 * float32(y) / float32(sizeY)},
-						}
-					case y > height-4: // Слои земли
-						blocks[idx] = Block{
-							Id:    1,
-							Color: [3]float32{0.5, 0.3, 0.1},
-						}
-					default: // Глубокие слои — камень
-						blocks[idx] = Block{
-							Id:    3,
-							Color: [3]float32{0.4, 0.4, 0.4},
-						}
+					// Пытаемся сгенерировать дерево
+					if rand.Float64() < treeProbability {
+						placeMinecraftTree(blocks, x, y+1, z, sizeX, sizeY, sizeZ)
 					}
 				} else {
 					// Воздух
@@ -325,29 +307,82 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.N
 			}
 		}
 	}
-	// 	}
-	// }
-
-	// Запуск воркеров
-	// for i := 0; i < numWorkers; i++ {
-	// 	wg.Add(1)
-	// 	go worker()
-	// }
-
-	// // Добавление задач в очередь
-	// for x := 0; x < sizeX; x++ {
-	// 	workQueue <- x
-	// }
-	// close(workQueue)
-
-	// // Ожидание завершения всех горутин
-	// wg.Wait()
 
 	return &Chunk{
 		Blocks: blocks,
 		SizeX:  sizeX,
 		SizeY:  sizeY,
 		SizeZ:  sizeZ,
+	}
+}
+
+// placeMinecraftTree: Сгенерировать простой «дуб» как в Minecraft
+func placeMinecraftTree(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
+	// Случайная высота ствола (обычно 4-7 блоков)
+	trunkHeight := 4 + rand.Intn(4) // от 4 до 7
+
+	// Ставим ствол
+	for i := 0; i < trunkHeight; i++ {
+		yy := y + i
+		if yy >= sizeY { // Если ствол выходит за границу чанка, прекращаем
+			break
+		}
+		idx := blockIndex(x, yy, z, sizeX, sizeY, sizeZ)
+		if idx >= 0 && idx < len(blocks) { // Убедимся, что индекс в пределах массива
+			// fmt.Printf("%d %d %d\n", x, yy, z)
+			blocks[idx] = Block{
+				Id:    5,                         // ID для «брёвен»
+				Color: [3]float32{0.6, 0.3, 0.1}, // Коричневый
+			}
+		}
+	}
+
+	// Верх ствола (где начинаются листья)
+	treetopY := y + trunkHeight
+	if treetopY >= sizeY { // Если крона выходит за пределы чанка, не создаем её
+		return
+	}
+
+	// Генерация кроны дерева
+	leafRadius := 2
+	leafHeight := 3 + rand.Intn(2) // Высота кроны от 3 до 4 блоков
+	for dy := 0; dy < leafHeight; dy++ {
+		yy := treetopY + dy
+		if yy >= sizeY { // Выход за верхнюю границу чанка
+			break
+		}
+
+		// Радиус листьев уменьшается к верхушке
+		levelRadius := leafRadius
+		if dy == leafHeight-1 {
+			levelRadius = leafRadius - 1
+			if levelRadius < 1 {
+				levelRadius = 1
+			}
+		}
+
+		for dx := -levelRadius; dx <= levelRadius; dx++ {
+			for dz := -levelRadius; dz <= levelRadius; dz++ {
+				nx := x + dx
+				nz := z + dz
+
+				// Проверяем границы чанка
+				if nx < 0 || nx >= sizeX || nz < 0 || nz >= sizeZ {
+					continue
+				}
+
+				// Проверяем форму кроны (окружность)
+				if dx*dx+dz*dz <= levelRadius*levelRadius {
+					idx := blockIndex(nx, yy, nz, sizeX, sizeY, sizeZ)
+					if idx >= 0 && idx < len(blocks) && blocks[idx].Id == 0 { // Ставим листья только на воздух
+						blocks[idx] = Block{
+							Id:    6, // ID для «листвы»
+							Color: [3]float32{0.0 + 0.3*rand.Float32(), 0.8 + 0.2*rand.Float32(), 0.0 + 0.3*rand.Float32()},
+						}
+					}
+				}
+			}
+		}
 	}
 }
 

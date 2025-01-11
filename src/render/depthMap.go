@@ -1,19 +1,20 @@
 package render
 
 import (
+	"engine/src/config"
 	"engine/src/world"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-func CreateDepthMap() {
+func CreateDepthMap(Config *config.Config) {
 	gl.GenFramebuffers(1, &depthMapFBO)
 
 	gl.GenTextures(1, &depthMap)
 	gl.BindTexture(gl.TEXTURE_2D, depthMap)
 	gl.TexImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT,
-		shadowWidth, shadowHeight, 0,
+		Config.ShadowWidth, Config.ShadowHeight, 0,
 		gl.DEPTH_COMPONENT, gl.FLOAT, nil)
 
 	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR) // Было GL_NEAREST
@@ -31,8 +32,8 @@ func CreateDepthMap() {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 }
 
-func RenderDepthMap(depthProgram uint32, worldObj *world.World, lightSpaceMatrix mgl32.Mat4) {
-	gl.Viewport(0, 0, shadowWidth, shadowHeight)
+func RenderDepthMap(depthProgram uint32, worldObj *world.World, lightSpaceMatrix mgl32.Mat4, Config *config.Config) {
+	gl.Viewport(0, 0, Config.ShadowWidth, Config.ShadowHeight)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, depthMapFBO)
 	gl.Clear(gl.DEPTH_BUFFER_BIT)
 
