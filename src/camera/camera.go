@@ -35,10 +35,11 @@ type Camera struct {
 	lastY       float64
 	mu          sync.Mutex
 
-	velocityY     float32
-	isOnGround    bool
-	creativeMode  bool // если true — режим «креатива» (полёт, нет коллизий)
-	ShowInfoPanel bool
+	velocityY       float32
+	isOnGround      bool
+	creativeMode    bool // если true — режим «креатива» (полёт, нет коллизий)
+	ShowInfoPanel   bool
+	lastPlaceAction time.Time
 }
 
 func NewCamera(position mgl32.Vec3) *Camera {
@@ -275,34 +276,48 @@ func isSolidAt(w *world.World, fx, fy, fz float64) bool {
 func (cam *Camera) InteractWithBlock(window *glfw.Window, w *world.World) {
 	// Проверяем нажатие левой кнопки мыши для удаления блока
 	if window.GetMouseButton(glfw.MouseButtonLeft) == glfw.Press {
-		targetBlock, _ := cam.raycast(w, 5.0)
+		currentTime := time.Now()
+		if currentTime.Sub(cam.lastPlaceAction) < 250*time.Millisecond {
+			// Если прошло меньше 500 мс, блок не ставится
+			return
+		}
+		// Используем raycast для получения пересекаемого блока
+		targetBlock, _, _ := cam.raycast(w, float64(7.0))
 		if targetBlock != nil {
 			// Удаляем блок
 			fmt.Printf("RemoveBlock %d %d %d\n", targetBlock[0], targetBlock[1], targetBlock[2])
 			w.RemoveBlock(targetBlock[0], targetBlock[1], targetBlock[2])
+			cam.lastPlaceAction = currentTime
 		}
 	}
 
 	// Проверяем нажатие правой кнопки мыши для добавления блока
 	if window.GetMouseButton(glfw.MouseButtonRight) == glfw.Press {
-		targetBlock, normal := cam.raycast(w, 5.0)
-		if targetBlock != nil {
-			// Вычисляем координаты нового блока (соседнего к целевому)
-			adjacentBlock := [3]int{
-				targetBlock[0] + int(normal.X()),
-				targetBlock[1] + int(normal.Y()),
-				targetBlock[2] + int(normal.Z()),
+		currentTime := time.Now()
+		if currentTime.Sub(cam.lastPlaceAction) < 250*time.Millisecond {
+			// Если прошло меньше 500 мс, блок не ставится
+			return
+		}
+		// Используем raycast для получения пересекаемого блока и позиции нового блока
+		_, normal, newBlockPos := cam.raycast(w, float64(7.0))
+		if newBlockPos != nil {
+			// Проверяем, чтобы новый блок не заменял существующий
+			existingBlock := w.GetBlock(newBlockPos[0], newBlockPos[1], newBlockPos[2])
+			if existingBlock.Id == 0 {
+				// Добавляем новый блок
+				fmt.Printf("SetBlock %d %d %d (Normal: %v)\n", newBlockPos[0], newBlockPos[1], newBlockPos[2], normal)
+				w.SetBlock(newBlockPos[0], newBlockPos[1], newBlockPos[2], world.Block{
+					Id:    1,                         // Пример ID блока
+					Color: [3]float32{0.8, 0.6, 0.4}, // Пример цвета
+				})
+				cam.lastPlaceAction = currentTime
 			}
-			// Добавляем новый блок
-			fmt.Printf("SetBlock %d %d %d\n", adjacentBlock[0], adjacentBlock[1], adjacentBlock[2])
-			w.SetBlock(adjacentBlock[0], adjacentBlock[1], adjacentBlock[2], world.Block{
-				Id:    1,                         // Пример ID блока
-				Color: [3]float32{0.0, 0.0, 0.0}, // Пример цвета
-			})
 		}
 	}
 }
-func (cam *Camera) raycast(w *world.World, maxDistance float32) (*[3]int, mgl32.Vec3) {
+
+func (cam *Camera) raycast(w *world.World, maxDistance float64) (*[3]int, mgl32.Vec3, *[3]int) {
+	// Расчет направления трассировки луча
 	direction := mgl32.Vec3{
 		float32(math.Cos(float64(mgl32.DegToRad(float32(cam.Yaw)))) * math.Cos(float64(mgl32.DegToRad(float32(cam.Pitch))))),
 		float32(math.Sin(float64(mgl32.DegToRad(float32(cam.Pitch))))),
@@ -310,20 +325,50 @@ func (cam *Camera) raycast(w *world.World, maxDistance float32) (*[3]int, mgl32.
 	}.Normalize()
 
 	origin := cam.Position
-	step := 0.1 // Шаг трассировки
-	for t := float32(0); t < maxDistance; t += float32(step) {
-		pos := origin.Add(direction.Mul(t))
-		x, y, z := int(pos.X()), int(pos.Y()), int(pos.Z())
+	step := 0.0001 // Шаг трассировки
+	for t := float64(0); t < maxDistance; t += step {
+		pos := origin.Add(direction.Mul(float32(t)))
+		x, y, z := int(math.Floor(float64(pos.X()))), int(math.Floor(float64(pos.Y()))), int(math.Floor(float64(pos.Z())))
+
 		block := w.GetBlock(x, y, z)
 		if block.Id != 0 {
-			// Возвращаем координаты блока и нормаль поверхности
-			normal := mgl32.Vec3{
-				pos.X() - float32(x),
-				pos.Y() - float32(y),
-				pos.Z() - float32(z),
-			}.Normalize()
-			return &[3]int{x, y, z}, normal
+			// Вычисляем направление нормали к грани блока
+			epsilon := float32(0.001)
+			dx := pos.X() - float32(x)
+			dy := pos.Y() - float32(y)
+			dz := pos.Z() - float32(z)
+
+			normal := mgl32.Vec3{}
+			if dx < epsilon {
+				normal = mgl32.Vec3{-1, 0, 0}
+			} else if dx > 1-epsilon {
+				normal = mgl32.Vec3{1, 0, 0}
+			}
+			if dy < epsilon {
+				normal = mgl32.Vec3{0, -1, 0}
+			} else if dy > 1-epsilon {
+				normal = mgl32.Vec3{0, 1, 0}
+			}
+			if dz < epsilon {
+				normal = mgl32.Vec3{0, 0, -1}
+			} else if dz > 1-epsilon {
+				normal = mgl32.Vec3{0, 0, 1}
+			}
+
+			// Если нормаль все еще (0, 0, 0), значит произошел сбой, пропускаем
+			if normal.Len() == 0 {
+				continue
+			}
+
+			// Вычисляем координаты нового блока на основе нормали
+			newBlockPos := &[3]int{
+				x + int(normal.X()),
+				y + int(normal.Y()),
+				z + int(normal.Z()),
+			}
+
+			return &[3]int{x, y, z}, normal, newBlockPos
 		}
 	}
-	return nil, mgl32.Vec3{}
+	return nil, mgl32.Vec3{}, nil
 }

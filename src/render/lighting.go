@@ -15,14 +15,12 @@ func GetLightProjection(Config *config.Config) mgl32.Mat4 {
 }
 func GetDynamicLightPos(playerPos mgl32.Vec3, timeOfDay float64) mgl32.Vec3 {
 	// Константы для настроек движения солнца
-	radius := float32(300.0) // Радиус вращения
-
-	heightScale := float32(650.0) // Максимальная высота солнца над горизонтом
-	baseHeight := float32(100.0)  // Базовая высота (горизонт или чуть ниже)
+	radius := float32(300.0)      // Радиус вращения
+	fixedHeight := float32(500.0) // Фиксированная высота солнца
 
 	// Вычисляем позицию солнца
 	x := playerPos.X() + radius*float32(math.Cos(timeOfDay))
-	y := playerPos.Y() + baseHeight + heightScale*float32(math.Sin(timeOfDay)) // Синус для подъёма/спуска
+	y := playerPos.Y() + fixedHeight // Высота фиксирована
 	z := playerPos.Z() + radius*float32(math.Sin(timeOfDay))
 
 	return mgl32.Vec3{x, y, z}
