@@ -1,9 +1,9 @@
 package main
 
 import (
-	"engine/src/camera"
 	"engine/src/config"
 	"engine/src/mainloop"
+	"engine/src/player"
 	"engine/src/render"
 	"engine/src/windows"
 	"engine/src/workers"
@@ -47,7 +47,7 @@ func main() {
 
 	// Настраиваем мир и камеру
 	worldObj := world.NewWorld(Config.ChunkX, Config.ChunkY, Config.ChunkZ)
-	cameraObj := camera.NewCamera(mgl32.Vec3{0, 120, 0})
+	cameraObj := player.NewCamera(mgl32.Vec3{0, 120, 0})
 
 	chunkGenCh := make(chan [2]int, 100)
 	chunkDelCh := make(chan [2]int, 1000000)

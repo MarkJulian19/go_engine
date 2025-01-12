@@ -1,4 +1,4 @@
-package camera
+package player
 
 import (
 	"fmt"
@@ -7,12 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"engine/src/world"
+
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/go-gl/mathgl/mgl32"
-
-	// Предположим, что в пакете world у нас есть метод GetBlock.
-	"engine/src/world"
 )
 
 var (
@@ -21,6 +20,8 @@ var (
 	jumpSpeed       = 20.0 // сила прыжка
 	playerHeight    = 1.8  // высота игрока (примерно 2 блока)
 	playerEyeOffset = 1.7  // где «глаза» относительно нижней точки
+	playerRadius    = 0.3  // Радиус капсулы
+	collisionStep   = 0.1  // Шаг проверки для окружности
 )
 
 // Camera описывает положение, ориентацию и «физику» игрока
@@ -247,20 +248,39 @@ func (cam *Camera) tryMove(pos mgl32.Vec3, dir mgl32.Vec3, dist float32, w *worl
 	candidate := pos.Add(dir.Mul(dist))
 
 	if cam.checkCollision(candidate, w) {
-		return pos
+		// Попробуем скорректировать движение, исключая ось
+		if !cam.checkCollision(pos.Add(mgl32.Vec3{dir.X() * dist, 0, 0}), w) {
+			return pos.Add(mgl32.Vec3{dir.X() * dist, 0, 0})
+		}
+		if !cam.checkCollision(pos.Add(mgl32.Vec3{0, 0, dir.Z() * dist}), w) {
+			return pos.Add(mgl32.Vec3{0, 0, dir.Z() * dist})
+		}
+		return pos // Полная блокировка
 	}
 	return candidate
 }
 
 // checkCollision — проверяем коллизию «капсулы» игрока
 func (cam *Camera) checkCollision(pos mgl32.Vec3, w *world.World) bool {
-	stepCount := int(playerHeight * 2.0) // ~3
-	heightStep := float32(playerHeight) / float32(stepCount)
+	stepCount := int(playerHeight / collisionStep)
+	angleStep := math.Pi * 2 / 8 // Проверяем 8 точек на окружности
 
 	for i := 0; i <= stepCount; i++ {
-		checkY := float64(pos.Y()) - playerEyeOffset + (float64(i) * float64(heightStep))
-		if isSolidAt(w, float64(pos.X()), checkY, float64(pos.Z())) {
-			return true
+		checkY := pos.Y() - float32(playerEyeOffset) + float32(i)*float32(collisionStep)
+
+		for angle := 0.0; angle < math.Pi*2; angle += angleStep {
+			offsetX := float32(math.Cos(angle)) * float32(playerRadius)
+			offsetZ := float32(math.Sin(angle)) * float32(playerRadius)
+
+			checkPos := mgl32.Vec3{
+				pos.X() + offsetX,
+				checkY,
+				pos.Z() + offsetZ,
+			}
+
+			if isSolidAt(w, float64(checkPos.X()), float64(checkPos.Y()), float64(checkPos.Z())) {
+				return true
+			}
 		}
 	}
 	return false
@@ -305,6 +325,9 @@ func (cam *Camera) InteractWithBlock(window *glfw.Window, w *world.World) {
 		}
 		// Используем raycast для получения пересекаемого блока и позиции нового блока
 		_, normal, newBlockPos := cam.raycast(w, float64(7.0))
+		// checkPos := mgl32.Vec3{float32(newBlockPos[0]), float32(newBlockPos[1]), float32(newBlockPos[2])}
+		// checkPos.Normalize()
+		// println(checkPos.X, checkPos.Y, checkPos.Z)
 		if newBlockPos != nil {
 			// Проверяем, чтобы новый блок не заменял существующий
 			existingBlock := w.GetBlock(newBlockPos[0], newBlockPos[1], newBlockPos[2])

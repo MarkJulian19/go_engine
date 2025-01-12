@@ -1,8 +1,8 @@
 package render
 
 import (
-	"engine/src/camera"
 	"engine/src/config"
+	"engine/src/player"
 	"engine/src/world"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -29,7 +29,7 @@ func RenderScene(
 	program uint32,
 	config *config.Config,
 	worldObj *world.World,
-	cameraObj *camera.Camera,
+	cameraObj *player.Camera,
 	lightSpaceMatrix mgl32.Mat4,
 	lightPos mgl32.Vec3,
 	deltaTime float64,

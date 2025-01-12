@@ -1,8 +1,8 @@
 package workers
 
 import (
-	"engine/src/camera"
 	"engine/src/config"
+	"engine/src/player"
 	"engine/src/world"
 	"fmt"
 	"runtime"
@@ -38,7 +38,7 @@ func ChunkDeleterWorker(w *world.World, genCh, delCh <-chan [2]int, vramCh chan 
 }
 func UpdateWorld(
 	worldObj *world.World,
-	cameraObj *camera.Camera,
+	cameraObj *player.Camera,
 	chunkGenCh, chunkDelCh chan [2]int,
 	Config *config.Config,
 ) {
@@ -57,7 +57,7 @@ func UpdateWorld(
 		}
 	}()
 }
-func InitMouseHandler(window *glfw.Window, camera *camera.Camera) {
+func InitMouseHandler(window *glfw.Window, camera *player.Camera) {
 	window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
 	go func() {
 		for !window.ShouldClose() {
@@ -68,7 +68,7 @@ func InitMouseHandler(window *glfw.Window, camera *camera.Camera) {
 	}()
 }
 func MonitorMemoryStats(
-	cameraObj *camera.Camera,
+	cameraObj *player.Camera,
 	worldObj *world.World,
 	deltaTime float64,
 	memStatsCh chan<- []string,

@@ -1,7 +1,7 @@
 package render
 
 import (
-	"engine/src/camera"
+	"engine/src/player"
 	"engine/src/world"
 	"fmt"
 	"image"
@@ -153,7 +153,7 @@ func renderTexturedQuad(texture uint32, x, y, width, height float32) {
 	gl.DeleteBuffers(1, &ebo)
 	gl.DeleteVertexArrays(1, &vao)
 }
-func Get_hud_info(deltaTime float64, worldObj *world.World, cameraObj *camera.Camera) []string {
+func Get_hud_info(deltaTime float64, worldObj *world.World, cameraObj *player.Camera) []string {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
