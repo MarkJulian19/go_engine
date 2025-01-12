@@ -21,7 +21,6 @@ var (
 	jumpSpeed       = 20.0 // сила прыжка
 	playerHeight    = 1.8  // высота игрока (примерно 2 блока)
 	playerEyeOffset = 1.7  // где «глаза» относительно нижней точки
-	ShowInfoPanel   = false
 )
 
 // Camera описывает положение, ориентацию и «физику» игрока
@@ -39,6 +38,7 @@ type Camera struct {
 	isOnGround      bool
 	creativeMode    bool // если true — режим «креатива» (полёт, нет коллизий)
 	ShowInfoPanel   bool
+	ShowHUD         bool
 	lastPlaceAction time.Time
 }
 
@@ -53,6 +53,7 @@ func NewCamera(position mgl32.Vec3) *Camera {
 		isOnGround:    false,
 		creativeMode:  false,
 		ShowInfoPanel: false,
+		ShowHUD:       true,
 	}
 }
 
@@ -78,12 +79,16 @@ func (cam *Camera) ProcessKeyboard(window *glfw.Window, deltaTime float64, w *wo
 	cam.mu.Lock()
 	defer cam.mu.Unlock()
 
-	// Переключение креативного режима по клавише ']'
-	if window.GetKey(glfw.KeyI) == glfw.Press {
+	if window.GetKey(glfw.KeyF1) == glfw.Press {
+		cam.ShowHUD = !cam.ShowHUD
+		time.Sleep(200 * time.Millisecond) // Задержка для предотвращения дребезга
+	}
+	if window.GetKey(glfw.KeyF3) == glfw.Press {
 		cam.ShowInfoPanel = !cam.ShowInfoPanel
 		time.Sleep(200 * time.Millisecond) // Задержка для предотвращения дребезга
 	}
 
+	// Переключение креативного режима по клавише ']'
 	if window.GetKey(glfw.KeyRightBracket) == glfw.Press {
 		cam.creativeMode = !cam.creativeMode
 		if cam.creativeMode {

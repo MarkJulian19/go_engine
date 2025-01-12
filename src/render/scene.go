@@ -105,8 +105,4 @@ func RenderScene(
 		gl.DrawElements(gl.TRIANGLES, int32(chunk.IndicesCount), gl.UNSIGNED_INT, gl.PtrOffset(0))
 	}
 	worldObj.Mu.Unlock()
-	// Вызов HUD — используем textProgram
-	RenderDebugHUD(window, textProgram, Get_hud_info(deltaTime, worldObj, cameraObj))
-	window.SwapBuffers()
-	glfw.PollEvents()
 }

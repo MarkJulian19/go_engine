@@ -37,6 +37,7 @@ func main() {
 	renderProgram := render.InitShaders()
 	depthProgram := render.InitDepthShader()
 	textProgram := render.InitTextShader()
+	crosshairProgram := render.InitCrosshairShader()
 
 	// Создаём FBO и текстуру для карты теней
 	render.CreateDepthMap(Config)
@@ -58,5 +59,5 @@ func main() {
 	}
 	workers.InitMouseHandler(window, cameraObj)
 
-	mainloop.RunMainLoop(window, renderProgram, depthProgram, textProgram, Config, worldObj, cameraObj, vramGCCh)
+	mainloop.RunMainLoop(window, renderProgram, depthProgram, textProgram, crosshairProgram, Config, worldObj, cameraObj, vramGCCh)
 }

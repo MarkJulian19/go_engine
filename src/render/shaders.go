@@ -27,6 +27,15 @@ func InitDepthShader() uint32 {
 	return program
 }
 
+func InitCrosshairShader() uint32 {
+	program, err := CompileCrosshairShader()
+	if err != nil {
+		log.Fatalln("Error compiling crosshair shaders:", err)
+	}
+	gl.UseProgram(program)
+	return program
+}
+
 func InitTextShader() uint32 {
 	program, err := compileTextShader()
 	if err != nil {
@@ -249,6 +258,34 @@ void main()
     outputColor = vec4(finalColor, 1.0);
 }
 ` + "\x00"
+	return compileProgram(vertexShaderSrc, fragmentShaderSrc)
+}
+
+func CompileCrosshairShader() (uint32, error) {
+	vertexShaderSrc := `#version 410 core
+
+layout(location = 0) in vec3 inPosition;
+
+uniform mat4 ortho;
+
+void main()
+{
+    gl_Position = ortho * vec4(inPosition, 1.0);
+}
+` + "\x00"
+
+	fragmentShaderSrc := `#version 410 core
+
+uniform vec4 crosshairColor;
+
+out vec4 fragColor;
+
+void main()
+{
+    fragColor = crosshairColor;
+}
+` + "\x00"
+
 	return compileProgram(vertexShaderSrc, fragmentShaderSrc)
 }
 

@@ -19,7 +19,7 @@ var (
 
 func RunMainLoop(
 	window *glfw.Window,
-	renderProgram, depthProgram, textProgram uint32,
+	renderProgram, depthProgram, textProgram, crosshairProgram uint32,
 	config *config.Config,
 	worldObj *world.World,
 	cameraObj *camera.Camera,
@@ -54,9 +54,16 @@ func RunMainLoop(
 		lightProjection := render.GetLightProjection(config)
 		lightView := mgl32.LookAtV(dynamicLightPos, cameraObj.Position, lightUp)
 		lightSpaceMatrix := lightProjection.Mul4(lightView)
-
 		render.RenderDepthMap(depthProgram, worldObj, lightSpaceMatrix, config)
 		render.RenderReflection(renderProgram, config, worldObj, cameraObj, lightSpaceMatrix, dynamicLightPos)
 		render.RenderScene(window, renderProgram, config, worldObj, cameraObj, lightSpaceMatrix, dynamicLightPos, deltaTime, textProgram)
+		if cameraObj.ShowHUD {
+			render.RenderCrosshair(window, crosshairProgram)
+			if cameraObj.ShowInfoPanel {
+				render.RenderDebugHUD(window, textProgram, render.Get_hud_info(deltaTime, worldObj, cameraObj))
+			}
+		}
+		window.SwapBuffers()
+		glfw.PollEvents()
 	}
 }
