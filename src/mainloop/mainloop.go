@@ -55,7 +55,7 @@ func RunMainLoop(
 		lightView := mgl32.LookAtV(dynamicLightPos, playerObj.Position, lightUp)
 		lightSpaceMatrix := lightProjection.Mul4(lightView)
 		render.RenderDepthMap(depthProgram, worldObj, lightSpaceMatrix, config)
-		render.RenderReflection(renderProgram, config, worldObj, playerObj, lightSpaceMatrix, dynamicLightPos)
+		// render.RenderReflection(renderProgram, config, worldObj, playerObj, lightSpaceMatrix, dynamicLightPos)
 		render.RenderScene(window, renderProgram, config, worldObj, playerObj, lightSpaceMatrix, dynamicLightPos, deltaTime, textProgram)
 		if playerObj.ShowHUD {
 			render.RenderCrosshair(window, crosshairProgram)

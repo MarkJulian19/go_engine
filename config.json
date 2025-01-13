@@ -9,9 +9,9 @@
     "ChunkX":16,
     "ChunkY":16,
     "ChunkZ":16,
-    "FogStartLoc": 200.0,
-    "FogEndLoc": 300.0,
-    "ShadowDist": 400.0,
-    "ShadowWidth": 32000,
-    "ShadowHeight": 32000
+    "FogStartLoc": 50.0,
+    "FogEndLoc": 100.0,
+    "ShadowDist": 50.0,
+    "ShadowWidth": 2000,
+    "ShadowHeight": 2000
 }

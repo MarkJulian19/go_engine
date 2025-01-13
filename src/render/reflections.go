@@ -95,40 +95,40 @@ func RenderReflection(
 	gl.Uniform1i(shadowMapLoc, 1)
 
 	// Отрисовываем чанки (как обычно)
-	frustumPlanes := calculateFrustumPlanes(view, projection)
+	// frustumPlanes := calculateFrustumPlanes(view, projection)
 
-	worldObj.Mu.Lock()
-	for coord, chunk := range worldObj.Chunks {
-		// Если буферы не созданы / обновлены, создадим:
-		if chunk.VAO == 0 && len(chunk.Vertices) > 0 && len(chunk.Indices) > 0 {
-			safeDeleteBuffers(&chunk.VAO, &chunk.VBO, &chunk.EBO)
-			createChunkBuffers(chunk)
-			Cunt_ch++
-		} else if chunk.UpdateBuf {
-			updateChunkBuffers(chunk)
-		}
+	// worldObj.Mu.Lock()
+	// for coord, chunk := range worldObj.Chunks {
+	// 	// Если буферы не созданы / обновлены, создадим:
+	// 	if chunk.VAO == 0 && len(chunk.Vertices) > 0 && len(chunk.Indices) > 0 {
+	// 		safeDeleteBuffers(&chunk.VAO, &chunk.VBO, &chunk.EBO)
+	// 		createChunkBuffers(chunk)
+	// 		Cunt_ch++
+	// 	} else if chunk.UpdateBuf {
+	// 		updateChunkBuffers(chunk)
+	// 	}
 
-		// Фрустум-отсечение
-		chunkBounds := chunk.GetBoundingBox(coord)
-		if !isChunkVisible(frustumPlanes, chunkBounds) {
-			continue
-		}
+	// 	// Фрустум-отсечение
+	// 	chunkBounds := chunk.GetBoundingBox(coord)
+	// 	if !isChunkVisible(frustumPlanes, chunkBounds) {
+	// 		continue
+	// 	}
 
-		if chunk.VAO == 0 {
-			continue
-		}
+	// 	if chunk.VAO == 0 {
+	// 		continue
+	// 	}
 
-		model := mgl32.Translate3D(
-			float32(coord[0]*chunk.SizeX),
-			0,
-			float32(coord[1]*chunk.SizeZ),
-		)
-		setUniformMatrix4fv(program, "model", model)
+	// 	model := mgl32.Translate3D(
+	// 		float32(coord[0]*chunk.SizeX),
+	// 		0,
+	// 		float32(coord[1]*chunk.SizeZ),
+	// 	)
+	// 	setUniformMatrix4fv(program, "model", model)
 
-		gl.BindVertexArray(chunk.VAO)
-		gl.DrawElements(gl.TRIANGLES, int32(chunk.IndicesCount), gl.UNSIGNED_INT, gl.PtrOffset(0))
-	}
-	worldObj.Mu.Unlock()
+	// 	gl.BindVertexArray(chunk.VAO)
+	// 	gl.DrawElements(gl.TRIANGLES, int32(chunk.IndicesCount), gl.UNSIGNED_INT, gl.PtrOffset(0))
+	// }
+	// worldObj.Mu.Unlock()
 
 	// 4) Возвращаем камеру на место
 	cameraObj.Position = originalPos

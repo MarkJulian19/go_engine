@@ -10,13 +10,10 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 )
 
-var (
-	depthMapFBO uint32
-	depthMap    uint32
-)
-
 // Параметры для отражения (planar reflection)
 var (
+	depthMapFBO   uint32
+	depthMap      uint32
 	reflectionFBO uint32
 	reflectionTex uint32
 	reflectWidth  = int32(1024)
