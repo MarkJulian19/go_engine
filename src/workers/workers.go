@@ -106,3 +106,12 @@ func MonitorMemoryStats(
 		}
 	}()
 }
+func InitPhysicsHandler(player *player.Camera, worldObj *world.World) {
+	go func() {
+		ticker := time.NewTicker(time.Second / 64) // Обновление 12 раз в секунду
+		defer ticker.Stop()
+		for range ticker.C {
+			player.UpdatePhysics(float64(1.0/64.0), worldObj)
+		}
+	}()
+}

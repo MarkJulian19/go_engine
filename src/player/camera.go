@@ -186,7 +186,7 @@ func (cam *Camera) ProcessKeyboard(window *glfw.Window, deltaTime float64, w *wo
 			fmt.Println("Wireframe OFF")
 			gl.PolygonMode(gl.FRONT_AND_BACK, gl.FILL)
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 

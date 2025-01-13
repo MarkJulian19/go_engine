@@ -58,6 +58,7 @@ func main() {
 		workers.ChunkDeleterWorker(worldObj, chunkGenCh, chunkDelCh, vramGCCh)
 	}
 	workers.InitMouseHandler(window, cameraObj)
+	workers.InitPhysicsHandler(cameraObj, worldObj)
 
 	mainloop.RunMainLoop(window, renderProgram, depthProgram, textProgram, crosshairProgram, Config, worldObj, cameraObj, vramGCCh)
 }

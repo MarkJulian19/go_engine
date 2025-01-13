@@ -42,7 +42,7 @@ func RunMainLoop(
 
 		// Обработка клавиш и физики
 		playerObj.ProcessKeyboard(window, deltaTime, worldObj)
-		playerObj.UpdatePhysics(deltaTime, worldObj)
+
 		playerObj.InteractWithBlock(window, worldObj)
 		// Обновляем мир (генерация / удаление чанков)
 
