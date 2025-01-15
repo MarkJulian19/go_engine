@@ -1,7 +1,6 @@
 package world
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -51,6 +50,11 @@ func NewWorld(sizeX, sizeY, sizeZ int) *World {
 func blockIndex(x, y, z, sizeX, sizeY, sizeZ int) int {
 	return x + y*sizeX + z*sizeX*sizeY
 }
+
+// var (
+// 	biomeNoise   = opensimplex.New(rand.Int63()) // Для биомов
+// 	terrainNoise = opensimplex.New(rand.Int63())
+// )
 
 // Создает новый чанк
 // func NewChunk(sizeX, sizeY, sizeZ int) *Chunk {
@@ -212,9 +216,9 @@ func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint
 				if block.Id == 0 {
 					continue // Воздух не рисуем
 				}
-				if block.Id == 5 {
-					fmt.Println(5) // Воздух не рисуем
-				}
+				// if block.Id == 5 {
+				// 	fmt.Println(5) // Воздух не рисуем
+				// }
 
 				// Для каждой из 6 граней куба
 				for _, face := range cubeFaces {
@@ -264,80 +268,275 @@ func (chunk *Chunk) GenerateMesh(neighbors map[string]*Chunk) ([]float32, []uint
 	return vertices, indices
 }
 
-func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.Noise) *Chunk {
+var (
+	biomeNoise   = opensimplex.New(rand.Int63())
+	terrainNoise = opensimplex.New(rand.Int63())
+	warpNoise    = opensimplex.New(rand.Int63())
+)
+
+// Параметры для каждого биома: минимальный и максимальный «коэффициент высоты», блок поверхности и подпочвы.
+type Biome struct {
+	Name            string
+	MinHeightFactor float64
+	MaxHeightFactor float64
+	SurfaceBlock    Block
+	SoilBlock       Block
+}
+
+// Определяем 4 «чистых» биома
+var (
+	biomeDesert = Biome{
+		Name:            "desert",
+		MinHeightFactor: 0.6,
+		MaxHeightFactor: 0.7,
+		SurfaceBlock: Block{
+			Id:    8, // Песок
+			Color: [3]float32{0.9, 0.8, 0.4},
+		},
+		SoilBlock: Block{
+			Id:    8, // Песок
+			Color: [3]float32{0.9, 0.8, 0.4},
+		},
+	}
+	biomePlains = Biome{
+		Name:            "plains",
+		MinHeightFactor: 0.7,
+		MaxHeightFactor: 0.85,
+		SurfaceBlock: Block{
+			Id:    9, // Луга
+			Color: [3]float32{0.4, 0.7, 0.1},
+		},
+		SoilBlock: Block{
+			Id:    1, // Земля
+			Color: [3]float32{0.45, 0.36, 0.2},
+		},
+	}
+	biomeForest = Biome{
+		Name:            "forest",
+		MinHeightFactor: 0.75,
+		MaxHeightFactor: 0.95,
+		SurfaceBlock: Block{
+			Id:    2, // Трава (лесная)
+			Color: [3]float32{0.1, 0.8, 0.1},
+		},
+		SoilBlock: Block{
+			Id:    1,
+			Color: [3]float32{0.45, 0.36, 0.2},
+		},
+	}
+	biomeMountains = Biome{
+		Name:            "mountains",
+		MinHeightFactor: 0.9,
+		MaxHeightFactor: 1.3, // Можно увеличить, если хотим высокие горы
+		SurfaceBlock: Block{
+			Id:    10, // Камень (грубый)
+			Color: [3]float32{0.6, 0.6, 0.6},
+		},
+		SoilBlock: Block{
+			Id:    3, // Камень
+			Color: [3]float32{0.5, 0.5, 0.5},
+		},
+	}
+)
+
+// Линейная интерполяция
+func lerp(a, b, t float64) float64 {
+	return a + (b-a)*t
+}
+
+// Плавная функция (s-кривая), чуть более «мягкая», чем линейная
+func smoothstep(edge0, edge1, x float64) float64 {
+	// Классический smoothstep: 3x^2 - 2x^3
+	if x <= edge0 {
+		return 0.0
+	}
+	if x >= edge1 {
+		return 1.0
+	}
+	t := (x - edge0) / (edge1 - edge0)
+	return t * t * (3.0 - 2.0*t)
+}
+
+// Функция смешивает параметры двух биомов (A,B) с помощью t
+func blendBiomes(bA, bB Biome, t float64) Biome {
+	return Biome{
+		Name:            "mixed",
+		MinHeightFactor: lerp(bA.MinHeightFactor, bB.MinHeightFactor, t),
+		MaxHeightFactor: lerp(bA.MaxHeightFactor, bB.MaxHeightFactor, t),
+		// Упрощённо берём surface/soil от «доминантного» биома (если t<0.5 => bA)
+		// Можно усложнить и смешать цвета.
+		SurfaceBlock: func() Block {
+			if t < 0.5 {
+				return bA.SurfaceBlock
+			}
+			return bB.SurfaceBlock
+		}(),
+		SoilBlock: func() Block {
+			if t < 0.5 {
+				return bA.SoilBlock
+			}
+			return bB.SoilBlock
+		}(),
+	}
+}
+
+// Выдаёт "чистый" биом без смешивания, исходя из bVal
+// func pickPureBiome(bVal float64) Biome {
+// 	switch {
+// 	case bVal < -0.5:
+// 		return biomeDesert
+// 	case bVal < 0.0:
+// 		return biomePlains
+// 	case bVal < 0.5:
+// 		return biomeForest
+// 	default:
+// 		return biomeMountains
+// 	}
+// }
+
+// Выдаёт «смешанный» биом, если bVal попал в переходную зону между биомами
+func pickBiomeSmooth(bVal float64) Biome {
+	// Границы между биомами:
+	//   desert -> plains  около -0.5..-0.2
+	//   plains -> forest  около  0.0..+0.3
+	//   forest->mountains около +0.5..+0.7
+	//
+	// Можно подбирать под себя.
+	// Вокруг каждой границы делаем небольшой диапазон (transition) ~0.1..0.2,
+	// в котором делаем плавный (smoothstep) переход.
+	if bVal < -0.5 {
+		return biomeDesert
+	} else if bVal < -0.2 {
+		// Переход desert -> plains
+		// bVal=-0.5 => desert, bVal=-0.2 => plains
+		t := smoothstep(-0.5, -0.2, bVal)
+		return blendBiomes(biomeDesert, biomePlains, t)
+	} else if bVal < 0.0 {
+		return biomePlains
+	} else if bVal < 0.3 {
+		// Переход plains -> forest
+		// bVal=0.0 => plains, bVal=0.3 => forest
+		t := smoothstep(0.0, 0.3, bVal)
+		return blendBiomes(biomePlains, biomeForest, t)
+	} else if bVal < 0.5 {
+		return biomeForest
+	} else if bVal < 0.7 {
+		// Переход forest -> mountains
+		// bVal=0.5 => forest, bVal=0.7 => mountains
+		t := smoothstep(0.5, 0.7, bVal)
+		return blendBiomes(biomeForest, biomeMountains, t)
+	} else {
+		return biomeMountains
+	}
+}
+
+// ------------------- NewChunk с «warp» и плавными переходами -------------------
+func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int,
+	biomeNoise, terrainNoise, warpNoise opensimplex.Noise,
+) *Chunk {
+
 	blocks := make([]Block, sizeX*sizeY*sizeZ)
-	noiseScale := 100.0                   // Масштаб шума для базовой высоты
-	mountainScale := 200.0                // Масштаб шума для гор
-	riverNoiseScale := 300.0              // Масштаб шума для рек
-	biomeNoiseScale := 500.0              // Масштаб шума для биомов
-	seaLevel := int(float64(sizeY) * 0.3) // Уровень моря (30% от высоты мира)
+
+	// Хотим, чтобы ~60% высоты занимало твёрдое
+	maxTerrainHeight := int(0.6 * float64(sizeY))
+	seaLevel := int(0.25 * float64(sizeY))
+
+	// Шесть октав для рельефа
+	const octaves = 6
+	scales := []float64{256, 128, 64, 32, 16, 8}
+	amplitudes := []float64{1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125}
+
+	// Warp-параметры
+	warpScale := 64.0 // частота варпа
+	warpAmp := 20.0   // амплитуда варпа (чем больше, тем сильнее "завихрение")
 
 	for x := 0; x < sizeX; x++ {
 		for z := 0; z < sizeZ; z++ {
-			// Координаты в мире
-			absoluteX := x + offsetX*sizeX
-			absoluteZ := z + offsetZ*sizeZ
+			// Мировые координаты
+			worldX := float64(x + offsetX*sizeX)
+			worldZ := float64(z + offsetZ*sizeZ)
 
-			// Генерация биома
-			biomeNoise := noise.Eval2(float64(absoluteX)/biomeNoiseScale, float64(absoluteZ)/biomeNoiseScale)
-			biome := determineBiome(biomeNoise)
+			// 1) Вычисляем warp-смещение
+			wVal := warpNoise.Eval2(worldX/warpScale, worldZ/warpScale)
+			// wVal ~ [-1..1], умножаем на warpAmp => ~[-20..20]
+			warp := wVal * warpAmp
 
-			// Генерация базовой высоты
-			baseHeight := noise.Eval2(float64(absoluteX)/noiseScale, float64(absoluteZ)/noiseScale)
-			height := int((baseHeight + 1.0) * 0.3 * float64(sizeY-1)) // Высота ограничена 30% от размера чанка
+			// 2) Координаты для biomeNoise с учётом warp
+			warpedX := worldX + warp
+			warpedZ := worldZ - warp // можно вычесть warp, чтобы "заворачивать" сильнее
 
-			// Добавление гор
-			if biome == "mountains" {
-				mountainHeight := noise.Eval2(float64(absoluteX)/mountainScale, float64(absoluteZ)/mountainScale)
-				height += int((mountainHeight + 1.0) * 0.4 * float64(sizeY-1)) // Горы добавляют до 40% высоты
+			// 3) biomes: bVal ~ [-1..+1]
+			bVal := biomeNoise.Eval2(warpedX/300.0, warpedZ/300.0)
+
+			// 4) Получаем «смешанный» биом с помощью pickBiomeSmooth
+			currentBiome := pickBiomeSmooth(bVal)
+
+			// 5) Генерируем высоту terrainNoise (6 октав)
+			var totalNoise float64
+			var ampSum float64
+			for i := 0; i < octaves; i++ {
+				val := terrainNoise.Eval2(worldX/scales[i], worldZ/scales[i])
+				totalNoise += val * amplitudes[i]
+				ampSum += amplitudes[i]
+			}
+			totalNoise /= ampSum              // ~[-1..+1]
+			normNoise := (totalNoise + 1) / 2 // [0..1]
+
+			if normNoise < 0 {
+				normNoise = 0
+			}
+			if normNoise > 1 {
+				normNoise = 1
+			}
+			baseHeight := int(normNoise * float64(maxTerrainHeight))
+
+			// 6) «фактор» высоты (между MinHeightFactor..MaxHeightFactor)
+			factor := lerp(currentBiome.MinHeightFactor, currentBiome.MaxHeightFactor, normNoise)
+			finalHeight := int(float64(baseHeight) * factor)
+
+			if finalHeight < 0 {
+				finalHeight = 0
+			}
+			if finalHeight >= sizeY {
+				finalHeight = sizeY - 1
 			}
 
-			// Генерация рек
-			riverNoise := noise.Eval2(float64(absoluteX)/riverNoiseScale, float64(absoluteZ)/riverNoiseScale)
-			isRiver := math.Abs(riverNoise) < 0.1 // Порог для реки
-
+			// 7) Заполняем блоки
 			for y := 0; y < sizeY; y++ {
 				idx := blockIndex(x, y, z, sizeX, sizeY, sizeZ)
 
-				if isRiver && y < seaLevel {
-					// Река заполняет блоки ниже уровня моря
-					blocks[idx] = Block{
-						Id:    7, // ID воды
-						Color: [3]float32{0.0, 0.0, 1.0},
-					}
-					continue
-				}
-
-				if y < height {
-					// Заполнение горных биомов плотными блоками
-					if biome == "mountains" && y > height-5 {
+				if y < finalHeight {
+					if y < finalHeight-4 {
+						// Глубина
 						blocks[idx] = Block{
-							Id:    10, // Каменные вершины
-							Color: [3]float32{0.7, 0.7, 0.7},
+							Id:    3, // Камень
+							Color: [3]float32{0.5, 0.5, 0.5},
 						}
 					} else {
-						blocks[idx] = generateUndergroundBlock(y, height, biome)
+						// Почва
+						blocks[idx] = currentBiome.SoilBlock
 					}
-				} else if y == height {
-					// Верхний слой в зависимости от биома
-					blocks[idx] = generateSurfaceBlock(biome)
-
-					// Случайное дерево или растение
-					if biome == "forest" && rand.Float64() < 0.1 {
-						placeMinecraftTree(blocks, x, y+1, z, sizeX, sizeY, sizeZ)
-					}
-				} else if y <= seaLevel {
-					// Вода ниже уровня моря
+				} else if y == finalHeight {
+					// Поверхность
+					blocks[idx] = currentBiome.SurfaceBlock
+				} else if y < seaLevel {
 					blocks[idx] = Block{
-						Id:    7, // ID воды
+						Id:    7, // вода
 						Color: [3]float32{0.0, 0.0, 1.0},
 					}
 				} else {
-					// Воздух
 					blocks[idx] = Block{
-						Id:    0,
+						Id:    0, // воздух
 						Color: [3]float32{0.5, 0.8, 1.0},
 					}
+				}
+			}
+
+			// 8) Генерация дерева (только для plains/forest и только над водой)
+			if (currentBiome.Name == "plains" || currentBiome.Name == "forest") &&
+				finalHeight >= seaLevel && finalHeight < sizeY-1 {
+				if rand.Float64() < 0.02 {
+					placeTree(blocks, x, finalHeight+1, z, sizeX, sizeY, sizeZ)
 				}
 			}
 		}
@@ -351,74 +550,116 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int, noise opensimplex.N
 	}
 }
 
-func determineBiome(noiseValue float64) string {
-	if noiseValue < -0.3 {
-		return "desert"
-	} else if noiseValue < 0.0 {
-		return "plains"
-	} else if noiseValue < 0.3 {
-		return "forest"
-	}
-	return "mountains"
-}
+// pickBiome — выбирает «доминантный» биом на основе bValNorm (в [0..1]).
+// Чем ближе к 0 — тем более «сухо» (desert), чем ближе к 1 — тем «горнее».
+// func pickBiome(bValNorm float64) string {
+// 	switch {
+// 	case bValNorm < 0.25:
+// 		return "desert"
+// 	case bValNorm < 0.5:
+// 		return "plains"
+// 	case bValNorm < 0.75:
+// 		return "forest"
+// 	default:
+// 		return "mountains"
+// 	}
+// }
 
-func generateUndergroundBlock(y, height int, biome string) Block {
-	if biome == "desert" {
-		return Block{Id: 8, Color: [3]float32{0.9, 0.8, 0.4}} // Песок
-	}
-	return Block{Id: 3, Color: [3]float32{0.5, 0.5, 0.5}} // Камень
-}
+// // getSurfaceBlockForBiome — верхний блок (поверхность) по биому
+// func getSurfaceBlockForBiome(biome string) Block {
+// 	switch biome {
+// 	case "desert":
+// 		return Block{
+// 			Id:    8, // Песок
+// 			Color: [3]float32{0.9, 0.8, 0.4},
+// 		}
+// 	case "plains":
+// 		return Block{
+// 			Id:    9, // Луга
+// 			Color: [3]float32{0.4, 0.7, 0.1},
+// 		}
+// 	case "forest":
+// 		return Block{
+// 			Id:    2, // Трава (лесная)
+// 			Color: [3]float32{0.1, 0.8, 0.1},
+// 		}
+// 	case "mountains":
+// 		return Block{
+// 			Id:    10, // Камень (грубый)
+// 			Color: [3]float32{0.6, 0.6, 0.6},
+// 		}
+// 	}
+// 	// По умолчанию — трава
+// 	return Block{
+// 		Id:    2,
+// 		Color: [3]float32{0.1, 0.8, 0.1},
+// 	}
+// }
 
-func generateSurfaceBlock(biome string) Block {
-	switch biome {
-	case "desert":
-		return Block{Id: 8, Color: [3]float32{0.9, 0.8, 0.4}} // Песок
-	case "forest":
-		return Block{Id: 2, Color: [3]float32{0.1, 0.8, 0.1}} // Трава
-	case "plains":
-		return Block{Id: 9, Color: [3]float32{0.4, 0.7, 0.1}} // Луга
-	case "mountains":
-		return Block{Id: 10, Color: [3]float32{0.7, 0.7, 0.7}} // Каменные вершины
-	}
-	return Block{Id: 2, Color: [3]float32{0.1, 0.8, 0.1}}
-}
+// getSoilBlockForBiome — подпочва (слои под поверхностью)
+// func getSoilBlockForBiome(biome string) Block {
+// 	switch biome {
+// 	case "desert":
+// 		return Block{
+// 			Id:    8, // Песок
+// 			Color: [3]float32{0.9, 0.8, 0.4},
+// 		}
+// 	case "plains", "forest":
+// 		return Block{
+// 			Id:    1, // Земля
+// 			Color: [3]float32{0.45, 0.36, 0.2},
+// 		}
+// 	case "mountains":
+// 		return Block{
+// 			Id:    3, // Камень
+// 			Color: [3]float32{0.5, 0.5, 0.5},
+// 		}
+// 	}
+// 	// По умолчанию — земля
+// 	return Block{
+// 		Id:    1,
+// 		Color: [3]float32{0.45, 0.36, 0.2},
+// 	}
+// }
 
-func placeMinecraftTree(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
-	trunkHeight := 4 + rand.Intn(4) // Случайная высота ствола
-
-	// Генерация ствола
+// placeTree — простое «майнкрафтовское» дерево
+func placeTree(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
+	trunkHeight := 4 + rand.Intn(3)
 	for i := 0; i < trunkHeight; i++ {
 		yy := y + i
 		if yy >= sizeY {
 			break
 		}
 		idx := blockIndex(x, yy, z, sizeX, sizeY, sizeZ)
-		if idx >= 0 && idx < len(blocks) {
-			blocks[idx] = Block{
-				Id:    5, // ID ствола
-				Color: [3]float32{0.6, 0.3, 0.1},
-			}
+		blocks[idx] = Block{
+			Id:    5, // Ствол
+			Color: [3]float32{0.5, 0.3, 0.1},
 		}
 	}
-
-	// Генерация кроны
 	generateLeaves(blocks, x, y+trunkHeight, z, sizeX, sizeY, sizeZ)
 }
 
+// generateLeaves — простая «сфера» листьев радиусом 2
 func generateLeaves(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
-	leafRadius := 2
-	leafHeight := 3 + rand.Intn(2)
-	for dy := 0; dy < leafHeight; dy++ {
-		yy := y + dy
-		for dx := -leafRadius; dx <= leafRadius; dx++ {
-			for dz := -leafRadius; dz <= leafRadius; dz++ {
-				nx, nz := x+dx, z+dz
-				if dx*dx+dz*dz <= leafRadius*leafRadius {
-					idx := blockIndex(nx, yy, nz, sizeX, sizeY, sizeZ)
-					if idx >= 0 && idx < len(blocks) && blocks[idx].Id == 0 {
+	const radius = 2
+	for offX := -radius; offX <= radius; offX++ {
+		for offZ := -radius; offZ <= radius; offZ++ {
+			for offY := -radius; offY <= radius; offY++ {
+				nx := x + offX
+				ny := y + offY
+				nz := z + offZ
+				if nx < 0 || nx >= sizeX ||
+					ny < 0 || ny >= sizeY ||
+					nz < 0 || nz >= sizeZ {
+					continue
+				}
+				dist := math.Sqrt(float64(offX*offX + offY*offY + offZ*offZ))
+				if dist <= float64(radius) {
+					idx := blockIndex(nx, ny, nz, sizeX, sizeY, sizeZ)
+					if blocks[idx].Id == 0 || blocks[idx].Id == 7 {
 						blocks[idx] = Block{
-							Id:    6, // ID листвы
-							Color: [3]float32{0.0 + 0.3*rand.Float32(), 0.8 + 0.2*rand.Float32(), 0.0 + 0.3*rand.Float32()},
+							Id:    6, // Листва
+							Color: [3]float32{0.0, 0.8, 0.0},
 						}
 					}
 				}
@@ -426,6 +667,16 @@ func generateLeaves(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
 		}
 	}
 }
+
+// Простой выбор блока для подземной части.
+// В реальном проекте лучше учитывать биомы, глубину и т.д.
+// func generateUndergroundBlock() Block {
+// 	// Пусть будет камень
+// 	return Block{
+// 		Id:    3,
+// 		Color: [3]float32{0.5, 0.5, 0.5},
+// 	}
+// }
 
 // Модифицируем GenerateChunk для передачи глобальных координат
 func (w *World) GenerateChunk(cx, cz int) {
@@ -437,8 +688,9 @@ func (w *World) GenerateChunk(cx, cz int) {
 		return
 	}
 	w.Mu.Unlock()
-	noise := opensimplex.New(2000)
-	newChunk := NewChunk(w.SizeX, w.SizeY, w.SizeZ, cx, cz, noise)
+	// noise := opensimplex.New(2000)
+
+	newChunk := NewChunk(w.SizeX, w.SizeY, w.SizeZ, cx, cz, biomeNoise, terrainNoise, warpNoise)
 
 	// defer
 	w.Mu.Lock()
