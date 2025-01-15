@@ -287,8 +287,8 @@ type Biome struct {
 var (
 	biomeDesert = Biome{
 		Name:            "desert",
-		MinHeightFactor: 0.6,
-		MaxHeightFactor: 0.7,
+		MinHeightFactor: 0.4,
+		MaxHeightFactor: 0.5,
 		SurfaceBlock: Block{
 			Id:    8, // Песок
 			Color: [3]float32{0.9, 0.8, 0.4},
@@ -300,8 +300,8 @@ var (
 	}
 	biomePlains = Biome{
 		Name:            "plains",
-		MinHeightFactor: 0.7,
-		MaxHeightFactor: 0.85,
+		MinHeightFactor: 0.55,
+		MaxHeightFactor: 0.65,
 		SurfaceBlock: Block{
 			Id:    9, // Луга
 			Color: [3]float32{0.4, 0.7, 0.1},
@@ -313,8 +313,8 @@ var (
 	}
 	biomeForest = Biome{
 		Name:            "forest",
-		MinHeightFactor: 0.75,
-		MaxHeightFactor: 0.95,
+		MinHeightFactor: 0.55,
+		MaxHeightFactor: 0.75,
 		SurfaceBlock: Block{
 			Id:    2, // Трава (лесная)
 			Color: [3]float32{0.1, 0.8, 0.1},
@@ -326,8 +326,8 @@ var (
 	}
 	biomeMountains = Biome{
 		Name:            "mountains",
-		MinHeightFactor: 0.9,
-		MaxHeightFactor: 1.3, // Можно увеличить, если хотим высокие горы
+		MinHeightFactor: 0.7,
+		MaxHeightFactor: 2.3, // Можно увеличить, если хотим высокие горы
 		SurfaceBlock: Block{
 			Id:    10, // Камень (грубый)
 			Color: [3]float32{0.6, 0.6, 0.6},
@@ -439,7 +439,7 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int,
 
 	// Хотим, чтобы ~60% высоты занимало твёрдое
 	maxTerrainHeight := int(0.6 * float64(sizeY))
-	seaLevel := int(0.25 * float64(sizeY))
+	seaLevel := int(0.15 * float64(sizeY))
 
 	// Шесть октав для рельефа
 	const octaves = 6
