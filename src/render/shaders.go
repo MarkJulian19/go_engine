@@ -184,14 +184,16 @@ float calculateShadow(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir)
     //float bias = 0.00001; 
     // Применение PCF (Percentage Closer Filtering)
     float shadow = 0.0;
-    vec2 texelSize = 1.0 / textureSize(shadowMap, 0); // Размер одного текселя
-    for (int x = -1; x <= 1; ++x) {
-        for (int y = -1; y <= 1; ++y) {
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0); 
+    // Увеличиваем диапазон шага - например, 2, а не 1:
+    for (int x = -2; x <= 2; ++x) {
+        for (int y = -2; y <= 2; ++y) {
             float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
             shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
         }
     }
-    shadow /= 9.0; // Усредняем значение теней
+    // Теперь получим 25 выборок вместо 9.
+    shadow /= 25.0;
 
     return shadow;
 }

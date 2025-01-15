@@ -54,7 +54,7 @@ func main() {
 	vramGCCh := make(chan [3]uint32, 1000000)
 	workers.UpdateWorld(worldObj, cameraObj, chunkGenCh, chunkDelCh, Config)
 	for i := 0; i < Config.NumWorkers; i++ {
-		workers.ChunkCreatorWorker(worldObj, chunkGenCh, chunkDelCh, vramGCCh)
+		workers.ChunkCreatorWorker(worldObj, chunkGenCh, chunkDelCh, vramGCCh, Config)
 		workers.ChunkDeleterWorker(worldObj, chunkGenCh, chunkDelCh, vramGCCh)
 	}
 	workers.InitMouseHandler(window, cameraObj)

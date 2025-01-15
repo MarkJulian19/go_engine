@@ -48,7 +48,7 @@ func NewCamera(position mgl32.Vec3) *Camera {
 		Position:      position,
 		Yaw:           -90.0,
 		Pitch:         0.0,
-		Speed:         55.0,
+		Speed:         105.0,
 		Sensitivity:   0.05,
 		velocityY:     0,
 		isOnGround:    false,

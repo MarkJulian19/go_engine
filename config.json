@@ -1,8 +1,8 @@
 {
     "ContextVersionMajor": 4,
     "ContextVersionMinor": 1,
-    "Width":   2560,
-	"Height":  1440,
+    "Width":   1920,
+	"Height":  1080,
 	"Title": "3D Engine",
     "ChunkDist": 30,
     "NumWorkers": 16,
@@ -11,7 +11,11 @@
     "ChunkZ":16,
     "FogStartLoc": 600.0,
     "FogEndLoc": 800.0,
-    "ShadowDist": 400.0,
+    "ShadowDist": 300.0,
     "ShadowWidth": 32000,
-    "ShadowHeight": 32000
+    "ShadowHeight": 32000,
+    "WarpScale":94.0,
+    "WarpAmp":60.0,
+    "MaxTerrainHeight":0.6,
+    "SeaLevel":0.15
 }

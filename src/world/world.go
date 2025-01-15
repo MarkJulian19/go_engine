@@ -1,6 +1,7 @@
 package world
 
 import (
+	"engine/src/config"
 	"math"
 	"math/rand"
 	"sync"
@@ -133,35 +134,6 @@ func (chunk *Chunk) CreateBuffers(neighbors map[string]*Chunk) {
 	chunk.Indices = indices
 	chunk.CreateBuf = true
 
-	// Удаляем старые буферы, если они существуют
-	// if chunk.VAO != 0 {
-	// 	gl.DeleteVertexArrays(1, &chunk.VAO)
-	// }
-	// if chunk.VBO != 0 {
-	// 	gl.DeleteBuffers(1, &chunk.VBO)
-	// }
-	// if chunk.EBO != 0 {
-	// 	gl.DeleteBuffers(1, &chunk.EBO)
-	// }
-
-	// var vao, vbo, ebo uint32
-	// gl.GenVertexArrays(1, &vao)
-	// gl.BindVertexArray(vao)
-
-	// gl.GenBuffers(1, &vbo)
-	// gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	// gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(vertices), gl.STATIC_DRAW)
-
-	// gl.GenBuffers(1, &ebo)
-	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	// gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*4, gl.Ptr(indices), gl.STATIC_DRAW)
-
-	// gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0))
-	// gl.EnableVertexAttribArray(0)
-	// gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4))
-	// gl.EnableVertexAttribArray(1)
-
-	// chunk.VAO, chunk.VBO, chunk.EBO = vao, vbo, ebo
 }
 
 // Обновляет буферы и меш чанка
@@ -172,35 +144,6 @@ func (chunk *Chunk) UpdateBuffers(neighbors map[string]*Chunk) {
 	chunk.Vertices = Vertices
 	chunk.Indices = indices
 	chunk.UpdateBuf = true
-	// Удаляем старые буферы, если они существуют
-	// if chunk.VAO != 0 {
-	// 	gl.DeleteVertexArrays(1, &chunk.VAO)
-	// }
-	// if chunk.VBO != 0 {
-	// 	gl.DeleteBuffers(1, &chunk.VBO)
-	// }
-	// if chunk.EBO != 0 {
-	// 	gl.DeleteBuffers(1, &chunk.EBO)
-	// }
-
-	// var vao, vbo, ebo uint32
-	// gl.GenVertexArrays(1, &vao)
-	// gl.BindVertexArray(vao)
-
-	// gl.GenBuffers(1, &vbo)
-	// gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-	// gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(vertices), gl.STATIC_DRAW)
-
-	// gl.GenBuffers(1, &ebo)
-	// gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-	// gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*4, gl.Ptr(indices), gl.STATIC_DRAW)
-
-	// gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0))
-	// gl.EnableVertexAttribArray(0)
-	// gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4))
-	// gl.EnableVertexAttribArray(1)
-
-	// chunk.VAO, chunk.VBO, chunk.EBO = vao, vbo, ebo
 }
 
 // Генерирует меш чанка
@@ -288,7 +231,7 @@ var (
 	biomeDesert = Biome{
 		Name:            "desert",
 		MinHeightFactor: 0.4,
-		MaxHeightFactor: 0.5,
+		MaxHeightFactor: 0.6,
 		SurfaceBlock: Block{
 			Id:    8, // Песок
 			Color: [3]float32{0.9, 0.8, 0.4},
@@ -327,7 +270,7 @@ var (
 	biomeMountains = Biome{
 		Name:            "mountains",
 		MinHeightFactor: 0.7,
-		MaxHeightFactor: 2.3, // Можно увеличить, если хотим высокие горы
+		MaxHeightFactor: 2.3, // Высокие горы
 		SurfaceBlock: Block{
 			Id:    10, // Камень (грубый)
 			Color: [3]float32{0.6, 0.6, 0.6},
@@ -335,6 +278,33 @@ var (
 		SoilBlock: Block{
 			Id:    3, // Камень
 			Color: [3]float32{0.5, 0.5, 0.5},
+		},
+	}
+	// --- Новые биомы ---
+	biomeSwamp = Biome{
+		Name:            "swamp",
+		MinHeightFactor: 0.25, // Низкие болота
+		MaxHeightFactor: 0.5,
+		SurfaceBlock: Block{
+			Id:    11,                        // Грязь/или "тёмная трава"
+			Color: [3]float32{0.2, 0.4, 0.1}, // Темнее, чем у обычной травы
+		},
+		SoilBlock: Block{
+			Id:    1,                          // Земля
+			Color: [3]float32{0.3, 0.25, 0.1}, // Более коричневая
+		},
+	}
+	biomeSnow = Biome{
+		Name:            "snow",
+		MinHeightFactor: 0.6,
+		MaxHeightFactor: 1.2, // Будет чуть повышенный рельеф
+		SurfaceBlock: Block{
+			Id:    12, // Снег
+			Color: [3]float32{1.0, 1.0, 1.0},
+		},
+		SoilBlock: Block{
+			Id:    3, // Камень под снегом
+			Color: [3]float32{0.6, 0.6, 0.6},
 		},
 	}
 )
@@ -396,82 +366,86 @@ func blendBiomes(bA, bB Biome, t float64) Biome {
 
 // Выдаёт «смешанный» биом, если bVal попал в переходную зону между биомами
 func pickBiomeSmooth(bVal float64) Biome {
-	// Границы между биомами:
-	//   desert -> plains  около -0.5..-0.2
-	//   plains -> forest  около  0.0..+0.3
-	//   forest->mountains около +0.5..+0.7
-	//
-	// Можно подбирать под себя.
-	// Вокруг каждой границы делаем небольшой диапазон (transition) ~0.1..0.2,
-	// в котором делаем плавный (smoothstep) переход.
-	if bVal < -0.5 {
-		return biomeDesert
-	} else if bVal < -0.2 {
-		// Переход desert -> plains
-		// bVal=-0.5 => desert, bVal=-0.2 => plains
+	switch {
+	case bVal < -0.7:
+		// Чистый swamp
+		return biomeSwamp
+
+	case bVal < -0.5:
+		// Переход swamp -> desert
+		//   bVal=-0.7 => swamp, bVal=-0.5 => desert
+		t := smoothstep(-0.7, -0.5, bVal)
+		return blendBiomes(biomeSwamp, biomeDesert, t)
+
+	case bVal < -0.2:
+		// desert
 		t := smoothstep(-0.5, -0.2, bVal)
 		return blendBiomes(biomeDesert, biomePlains, t)
-	} else if bVal < 0.0 {
+
+	case bVal < 0.0:
 		return biomePlains
-	} else if bVal < 0.3 {
+
+	case bVal < 0.3:
 		// Переход plains -> forest
-		// bVal=0.0 => plains, bVal=0.3 => forest
 		t := smoothstep(0.0, 0.3, bVal)
 		return blendBiomes(biomePlains, biomeForest, t)
-	} else if bVal < 0.5 {
+
+	case bVal < 0.5:
 		return biomeForest
-	} else if bVal < 0.7 {
-		// Переход forest -> mountains
-		// bVal=0.5 => forest, bVal=0.7 => mountains
+
+	case bVal < 0.7:
+		// forest -> mountains
 		t := smoothstep(0.5, 0.7, bVal)
 		return blendBiomes(biomeForest, biomeMountains, t)
-	} else {
+
+	case bVal < 0.8:
 		return biomeMountains
+
+	case bVal < 0.9:
+		// mountains -> snow
+		//   bVal=0.8 => mountains, bVal=0.9 => snow
+		t := smoothstep(0.8, 0.9, bVal)
+		return blendBiomes(biomeMountains, biomeSnow, t)
+
+	default:
+		// Чистый snow
+		return biomeSnow
 	}
 }
 
 // ------------------- NewChunk с «warp» и плавными переходами -------------------
 func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int,
-	biomeNoise, terrainNoise, warpNoise opensimplex.Noise,
+	biomeNoise, terrainNoise, warpNoise opensimplex.Noise, Config *config.Config,
 ) *Chunk {
 
 	blocks := make([]Block, sizeX*sizeY*sizeZ)
 
 	// Хотим, чтобы ~60% высоты занимало твёрдое
-	maxTerrainHeight := int(0.6 * float64(sizeY))
-	seaLevel := int(0.15 * float64(sizeY))
+	maxTerrainHeight := int(Config.MaxTerrainHeight * float64(sizeY))
+	seaLevel := int(Config.SeaLevel * float64(sizeY))
 
-	// Шесть октав для рельефа
 	const octaves = 6
 	scales := []float64{256, 128, 64, 32, 16, 8}
 	amplitudes := []float64{1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125}
 
-	// Warp-параметры
-	warpScale := 64.0 // частота варпа
-	warpAmp := 20.0   // амплитуда варпа (чем больше, тем сильнее "завихрение")
+	warpScale := Config.WarpScale
+	warpAmp := Config.WarpAmp
 
 	for x := 0; x < sizeX; x++ {
 		for z := 0; z < sizeZ; z++ {
-			// Мировые координаты
 			worldX := float64(x + offsetX*sizeX)
 			worldZ := float64(z + offsetZ*sizeZ)
 
-			// 1) Вычисляем warp-смещение
+			// Warp
 			wVal := warpNoise.Eval2(worldX/warpScale, worldZ/warpScale)
-			// wVal ~ [-1..1], умножаем на warpAmp => ~[-20..20]
 			warp := wVal * warpAmp
 
-			// 2) Координаты для biomeNoise с учётом warp
 			warpedX := worldX + warp
-			warpedZ := worldZ - warp // можно вычесть warp, чтобы "заворачивать" сильнее
-
-			// 3) biomes: bVal ~ [-1..+1]
+			warpedZ := worldZ - warp
 			bVal := biomeNoise.Eval2(warpedX/300.0, warpedZ/300.0)
 
-			// 4) Получаем «смешанный» биом с помощью pickBiomeSmooth
 			currentBiome := pickBiomeSmooth(bVal)
 
-			// 5) Генерируем высоту terrainNoise (6 октав)
 			var totalNoise float64
 			var ampSum float64
 			for i := 0; i < octaves; i++ {
@@ -479,21 +453,17 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int,
 				totalNoise += val * amplitudes[i]
 				ampSum += amplitudes[i]
 			}
-			totalNoise /= ampSum              // ~[-1..+1]
-			normNoise := (totalNoise + 1) / 2 // [0..1]
-
+			totalNoise /= ampSum
+			normNoise := (totalNoise + 1) / 2
 			if normNoise < 0 {
 				normNoise = 0
-			}
-			if normNoise > 1 {
+			} else if normNoise > 1 {
 				normNoise = 1
 			}
 			baseHeight := int(normNoise * float64(maxTerrainHeight))
 
-			// 6) «фактор» высоты (между MinHeightFactor..MaxHeightFactor)
 			factor := lerp(currentBiome.MinHeightFactor, currentBiome.MaxHeightFactor, normNoise)
 			finalHeight := int(float64(baseHeight) * factor)
-
 			if finalHeight < 0 {
 				finalHeight = 0
 			}
@@ -501,15 +471,14 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int,
 				finalHeight = sizeY - 1
 			}
 
-			// 7) Заполняем блоки
 			for y := 0; y < sizeY; y++ {
 				idx := blockIndex(x, y, z, sizeX, sizeY, sizeZ)
 
 				if y < finalHeight {
 					if y < finalHeight-4 {
-						// Глубина
+						// Глубина — камень
 						blocks[idx] = Block{
-							Id:    3, // Камень
+							Id:    3,
 							Color: [3]float32{0.5, 0.5, 0.5},
 						}
 					} else {
@@ -521,18 +490,16 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int,
 					blocks[idx] = currentBiome.SurfaceBlock
 				} else if y < seaLevel {
 					blocks[idx] = Block{
-						Id:    7, // вода
+						Id:    7, // Вода
 						Color: [3]float32{0.0, 0.0, 1.0},
 					}
 				} else {
 					blocks[idx] = Block{
-						Id:    0, // воздух
+						Id:    0, // Воздух
 						Color: [3]float32{0.5, 0.8, 1.0},
 					}
 				}
 			}
-
-			// 8) Генерация дерева (только для plains/forest и только над водой)
 			if (currentBiome.Name == "plains" || currentBiome.Name == "forest") &&
 				finalHeight >= seaLevel && finalHeight < sizeY-1 {
 				if rand.Float64() < 0.02 {
@@ -549,78 +516,6 @@ func NewChunk(sizeX, sizeY, sizeZ int, offsetX, offsetZ int,
 		SizeZ:  sizeZ,
 	}
 }
-
-// pickBiome — выбирает «доминантный» биом на основе bValNorm (в [0..1]).
-// Чем ближе к 0 — тем более «сухо» (desert), чем ближе к 1 — тем «горнее».
-// func pickBiome(bValNorm float64) string {
-// 	switch {
-// 	case bValNorm < 0.25:
-// 		return "desert"
-// 	case bValNorm < 0.5:
-// 		return "plains"
-// 	case bValNorm < 0.75:
-// 		return "forest"
-// 	default:
-// 		return "mountains"
-// 	}
-// }
-
-// // getSurfaceBlockForBiome — верхний блок (поверхность) по биому
-// func getSurfaceBlockForBiome(biome string) Block {
-// 	switch biome {
-// 	case "desert":
-// 		return Block{
-// 			Id:    8, // Песок
-// 			Color: [3]float32{0.9, 0.8, 0.4},
-// 		}
-// 	case "plains":
-// 		return Block{
-// 			Id:    9, // Луга
-// 			Color: [3]float32{0.4, 0.7, 0.1},
-// 		}
-// 	case "forest":
-// 		return Block{
-// 			Id:    2, // Трава (лесная)
-// 			Color: [3]float32{0.1, 0.8, 0.1},
-// 		}
-// 	case "mountains":
-// 		return Block{
-// 			Id:    10, // Камень (грубый)
-// 			Color: [3]float32{0.6, 0.6, 0.6},
-// 		}
-// 	}
-// 	// По умолчанию — трава
-// 	return Block{
-// 		Id:    2,
-// 		Color: [3]float32{0.1, 0.8, 0.1},
-// 	}
-// }
-
-// getSoilBlockForBiome — подпочва (слои под поверхностью)
-// func getSoilBlockForBiome(biome string) Block {
-// 	switch biome {
-// 	case "desert":
-// 		return Block{
-// 			Id:    8, // Песок
-// 			Color: [3]float32{0.9, 0.8, 0.4},
-// 		}
-// 	case "plains", "forest":
-// 		return Block{
-// 			Id:    1, // Земля
-// 			Color: [3]float32{0.45, 0.36, 0.2},
-// 		}
-// 	case "mountains":
-// 		return Block{
-// 			Id:    3, // Камень
-// 			Color: [3]float32{0.5, 0.5, 0.5},
-// 		}
-// 	}
-// 	// По умолчанию — земля
-// 	return Block{
-// 		Id:    1,
-// 		Color: [3]float32{0.45, 0.36, 0.2},
-// 	}
-// }
 
 // placeTree — простое «майнкрафтовское» дерево
 func placeTree(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
@@ -641,7 +536,7 @@ func placeTree(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
 
 // generateLeaves — простая «сфера» листьев радиусом 2
 func generateLeaves(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
-	const radius = 2
+	const radius = 3
 	for offX := -radius; offX <= radius; offX++ {
 		for offZ := -radius; offZ <= radius; offZ++ {
 			for offY := -radius; offY <= radius; offY++ {
@@ -668,18 +563,8 @@ func generateLeaves(blocks []Block, x, y, z, sizeX, sizeY, sizeZ int) {
 	}
 }
 
-// Простой выбор блока для подземной части.
-// В реальном проекте лучше учитывать биомы, глубину и т.д.
-// func generateUndergroundBlock() Block {
-// 	// Пусть будет камень
-// 	return Block{
-// 		Id:    3,
-// 		Color: [3]float32{0.5, 0.5, 0.5},
-// 	}
-// }
-
 // Модифицируем GenerateChunk для передачи глобальных координат
-func (w *World) GenerateChunk(cx, cz int) {
+func (w *World) GenerateChunk(cx, cz int, Config *config.Config) {
 
 	coord := [2]int{cx, cz}
 	w.Mu.Lock()
@@ -690,7 +575,7 @@ func (w *World) GenerateChunk(cx, cz int) {
 	w.Mu.Unlock()
 	// noise := opensimplex.New(2000)
 
-	newChunk := NewChunk(w.SizeX, w.SizeY, w.SizeZ, cx, cz, biomeNoise, terrainNoise, warpNoise)
+	newChunk := NewChunk(w.SizeX, w.SizeY, w.SizeZ, cx, cz, biomeNoise, terrainNoise, warpNoise, Config)
 
 	// defer
 	w.Mu.Lock()
@@ -711,87 +596,6 @@ func (w *World) GenerateChunk(cx, cz int) {
 	}
 
 }
-
-// func NewChunk(sizeX, sizeY, sizeZ int) *Chunk {
-// 	blocks := make([]Block, sizeX*sizeY*sizeZ)
-
-// 	for x := 0; x < sizeX; x++ {
-// 		for y := 0; y < sizeY; y++ {
-// 			for z := 0; z < sizeZ; z++ {
-// 				idx := blockIndex(x, y, z, sizeX, sizeY, sizeZ)
-// 				if y < 8 || z > 5 && y < 10 {
-// 					blocks[idx].Id = 1 // Земля
-// 				} else {
-// 					blocks[idx].Id = 0 // Воздух
-// 				}
-// 				blocks[idx].Color = [3]float32{
-// 					rand.Float32(),
-// 					rand.Float32(),
-// 					rand.Float32(),
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	return &Chunk{
-// 		Blocks: blocks,
-// 		SizeX:  sizeX,
-// 		SizeY:  sizeY,
-// 		SizeZ:  sizeZ,
-// 	}
-// }
-
-// func (w *World) GenerateChunk(cx, cz int) {
-// 	coord := [2]int{cx, cz}
-// 	if _, exists := w.Chunks[coord]; exists {
-// 		return // Чанк уже существует
-// 	}
-
-// 	chunk := w.NewChunk(w.SizeX, w.SizeY, w.SizeZ)
-
-// 	// Собираем соседние чанки
-// 	neighbors := map[string]*Chunk{
-// 		"left":  w.Chunks[[2]int{cx - 1, cz}],
-// 		"right": w.Chunks[[2]int{cx + 1, cz}],
-// 		"back":  w.Chunks[[2]int{cx, cz - 1}],
-// 		"front": w.Chunks[[2]int{cx, cz + 1}],
-// 	}
-
-//		chunk.GenerateBuffers(neighbors)
-//		w.Chunks[coord] = chunk
-//		for direction, neighbor := range neighbors {
-//			if neighbor != nil {
-//				updatedNeighbors := w.collectNeighbors(cx+offsets[direction][0], cz+offsets[direction][1])
-//				neighbor.UpdateBuffers(updatedNeighbors)
-//			}
-//		}
-//	}
-// func (chunk *Chunk) GenerateBuffers(neighbors map[string]*Chunk) {
-// 	vertices, indices := chunk.GenerateMesh(neighbors)
-// 	chunk.IndicesCount = len(indices)
-
-// 	var vao, vbo, ebo uint32
-// 	gl.GenVertexArrays(1, &vao)
-// 	gl.BindVertexArray(vao)
-
-// 	gl.GenBuffers(1, &vbo)
-// 	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-// 	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(vertices), gl.STATIC_DRAW)
-
-// 	gl.GenBuffers(1, &ebo)
-// 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
-// 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indices)*4, gl.Ptr(indices), gl.STATIC_DRAW)
-
-// 	// Настройка атрибутов вершин
-// 	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(0)) // Координаты
-// 	gl.EnableVertexAttribArray(0)
-// 	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 6*4, gl.PtrOffset(3*4)) // Цвет
-// 	gl.EnableVertexAttribArray(1)
-
-// 	chunk.VAO = vao
-// 	chunk.VBO = vbo
-// 	chunk.EBO = ebo
-// }
 
 // Собирает соседние чанки
 func (w *World) collectNeighbors(cx, cz int) map[string]*Chunk {
@@ -909,11 +713,6 @@ func (w *World) RemoveChunk(cx, cz int, vramCh chan [3]uint32) {
 	if !exists {
 		return // Чанк уже удален или не существует
 	}
-
-	// // Удаляем буферы OpenGL
-	// gl.DeleteVertexArrays(1, &chunk.VAO)
-	// gl.DeleteBuffers(1, &chunk.VBO)
-	// gl.DeleteBuffers(1, &chunk.EBO)
 
 	// Удаляем чанк из карты
 	vramCh <- [3]uint32{chunk.VAO, chunk.VBO, chunk.EBO}
