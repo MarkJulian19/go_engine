@@ -24,6 +24,10 @@ type Config struct {
 	ShadowDist          float32 `json:"ShadowDist"`
 	ShadowHeight        int32   `json:"ShadowHeight"`
 	ShadowWidth         int32   `json:"ShadowWidth"`
+	WarpScale           float64 `json:"WarpScale"`
+	WarpAmp             float64 `json:"WarpAmp"`
+	MaxTerrainHeight    float64 `json:"MaxTerrainHeight"`
+	SeaLevel            float64 `json:"SeaLevel"`
 }
 
 func LoadConfigFromFile(filePath string) (*Config, error) {

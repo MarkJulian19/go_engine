@@ -48,7 +48,7 @@ func NewCamera(position mgl32.Vec3) *Camera {
 		Position:      position,
 		Yaw:           -90.0,
 		Pitch:         0.0,
-		Speed:         15.0,
+		Speed:         105.0,
 		Sensitivity:   0.05,
 		velocityY:     0,
 		isOnGround:    false,
@@ -353,7 +353,7 @@ func (cam *Camera) raycast(w *world.World, maxDistance float64) (*[3]int, mgl32.
 	}.Normalize()
 
 	origin := cam.Position
-	step := 0.0001 // Шаг трассировки
+	step := 0.1 // Шаг трассировки
 	for t := float64(0); t < maxDistance; t += step {
 		pos := origin.Add(direction.Mul(float32(t)))
 		x, y, z := int(math.Floor(float64(pos.X()))), int(math.Floor(float64(pos.Y()))), int(math.Floor(float64(pos.Z())))
@@ -361,7 +361,7 @@ func (cam *Camera) raycast(w *world.World, maxDistance float64) (*[3]int, mgl32.
 		block := w.GetBlock(x, y, z)
 		if block.Id != 0 {
 			// Вычисляем направление нормали к грани блока
-			epsilon := float32(0.001)
+			epsilon := float32(0.1)
 			dx := pos.X() - float32(x)
 			dy := pos.Y() - float32(y)
 			dz := pos.Z() - float32(z)
